@@ -24,7 +24,7 @@ spec:
     kustomize:
       # Override image tag dynamically
       images:
-        - quay.io/YOUR_USERNAME/bootc-webserver=quay.io/YOUR_USERNAME/bootc-webserver:latest-disk
+        - quay.io/YOUR_USERNAME/bootc-webserver=quay.io/YOUR_USERNAME/bootc-webserver:20260827-1505-disk
 
   destination:
     server: https://kubernetes.default.svc
@@ -69,7 +69,7 @@ spec:
             imageTag: develop
           - env: staging
             namespace: bootable-containers-staging
-            imageTag: latest
+            imageTag: 20260827-1505
           - env: prod
             namespace: bootable-containers-prod
             imageTag: stable

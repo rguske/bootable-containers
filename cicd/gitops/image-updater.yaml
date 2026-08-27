@@ -31,8 +31,8 @@ metadata:
     # ArgoCD Image Updater annotations
     argocd-image-updater.argoproj.io/image-list: |
       disk=quay.io/YOUR_USERNAME/bootc-webserver
-    argocd-image-updater.argoproj.io/disk.update-strategy: semver
-    argocd-image-updater.argoproj.io/disk.allow-tags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+-disk$
+    argocd-image-updater.argoproj.io/disk.update-strategy: name
+    argocd-image-updater.argoproj.io/disk.allow-tags: regexp:^[0-9]{8}-[0-9]{4}-disk$
     argocd-image-updater.argoproj.io/write-back-method: git
     argocd-image-updater.argoproj.io/git-branch: main
 spec:

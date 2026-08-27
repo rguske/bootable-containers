@@ -31,8 +31,8 @@ spec:
     
     - name: image-tag
       type: string
-      description: Tag for the image
-      default: "latest"
+      description: Image tag. Leave empty to generate UTC YYYYMMDD-HHMM at run time (for example 20260827-1505). Do not use latest.
+      default: ""
     
     - name: registry-url
       type: string
@@ -65,7 +65,35 @@ spec:
       description: Docker config for registry auth
 
   tasks:
-    # Task 1: Clone the repository
+    # Task 1: Resolve image tag (UTC YYYYMMDD-HHMM unless a tag was passed in)
+    - name: set-image-tag
+      params:
+        - name: image-tag
+          value: $(params.image-tag)
+      taskSpec:
+        params:
+          - name: image-tag
+            type: string
+        results:
+          - name: tag
+            description: Image tag used for this run
+        steps:
+          - name: generate
+            image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+            env:
+              - name: IMAGE_TAG
+                value: $(params.image-tag)
+            script: |
+              #!/bin/sh
+              set -eu
+              TAG="${IMAGE_TAG}"
+              if [ -z "${TAG}" ]; then
+                TAG="$(date -u +%Y%m%d-%H%M)"
+              fi
+              printf '%s' "${TAG}" > "$(results.tag.path)"
+              echo "Using image tag: ${TAG}"
+
+    # Task 2: Clone the repository
     - name: git-clone
       taskRef:
         name: git-clone
@@ -79,16 +107,17 @@ spec:
         - name: output
           workspace: source
 
-    # Task 2: Build the bootc container image
+    # Task 3: Build the bootc container image
     - name: build-bootc-image
       taskRef:
         name: buildah
         kind: ClusterTask
       runAfter:
         - git-clone
+        - set-image-tag
       params:
         - name: IMAGE
-          value: "$(params.registry-url)/$(params.registry-namespace)/$(params.image-name):$(params.image-tag)"
+          value: "$(params.registry-url)/$(params.registry-namespace)/$(params.image-name):$(tasks.set-image-tag.results.tag)"
         - name: DOCKERFILE
           value: $(params.containerfile-path)
         - name: CONTEXT
@@ -101,7 +130,7 @@ spec:
         - name: dockerconfig
           workspace: dockerconfig
 
-    # Task 3: Convert to QCOW2
+    # Task 4: Convert to QCOW2
     - name: convert-to-qcow2
       taskRef:
         name: bootc-image-builder
@@ -110,7 +139,7 @@ spec:
         - build-bootc-image
       params:
         - name: source-image
-          value: "$(params.registry-url)/$(params.registry-namespace)/$(params.image-name):$(params.image-tag)"
+          value: "$(params.registry-url)/$(params.registry-namespace)/$(params.image-name):$(tasks.set-image-tag.results.tag)"
         - name: output-type
           value: "qcow2"
       workspaces:
@@ -119,7 +148,7 @@ spec:
         - name: dockerconfig
           workspace: dockerconfig
 
-    # Task 4: Package QCOW2 for OCP-V
+    # Task 5: Package QCOW2 for OCP-V
     - name: package-disk-image
       taskRef:
         name: buildah
@@ -128,7 +157,7 @@ spec:
         - convert-to-qcow2
       params:
         - name: IMAGE
-          value: "$(params.registry-url)/$(params.registry-namespace)/$(params.image-name):$(params.image-tag)-disk"
+          value: "$(params.registry-url)/$(params.registry-namespace)/$(params.image-name):$(tasks.set-image-tag.results.tag)-disk"
         - name: DOCKERFILE
           value: "demos/webserver/Containerfile.ocpv"
         - name: CONTEXT
@@ -139,7 +168,7 @@ spec:
         - name: dockerconfig
           workspace: dockerconfig
 
-    # Task 5: Deploy to OpenShift Virtualization
+    # Task 6: Deploy to OpenShift Virtualization
     - name: deploy-vm
       taskRef:
         name: openshift-client
@@ -150,7 +179,7 @@ spec:
         - name: SCRIPT
           value: |
             # Update DataVolume with new image
-            export IMAGE_URL="docker://$(params.registry-url)/$(params.registry-namespace)/$(params.image-name):$(params.image-tag)-disk"
+            export IMAGE_URL="docker://$(params.registry-url)/$(params.registry-namespace)/$(params.image-name):$(tasks.set-image-tag.results.tag)-disk"
             
             # Create namespace if not exists
             oc create namespace $(params.target-namespace) --dry-run=client -o yaml | oc apply -f -

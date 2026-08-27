@@ -16,9 +16,9 @@ on:
   workflow_dispatch:
     inputs:
       image_tag:
-        description: 'Image tag to use'
+        description: 'Image tag (leave empty for UTC YYYYMMDD-HHMM)'
         required: false
-        default: 'latest'
+        default: ''
 
 env:
   REGISTRY: quay.io
@@ -45,12 +45,9 @@ jobs:
       - name: Set up image tag
         id: meta
         run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            TAG="${{ github.event.inputs.image_tag }}"
-          elif [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            TAG="latest"
-          else
-            TAG="${{ github.sha }}"
+          TAG="${{ github.event.inputs.image_tag }}"
+          if [ -z "$TAG" ]; then
+            TAG="$(date -u +%Y%m%d-%H%M)"
           fi
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "full_image=${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/${{ env.IMAGE_NAME }}:${TAG}" >> $GITHUB_OUTPUT

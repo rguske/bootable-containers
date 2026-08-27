@@ -21,7 +21,7 @@ spec:
     - name: image-name
       value: "bootc-webserver"
     - name: image-tag
-      value: "v1.0"
+      value: ""  # empty = UTC YYYYMMDD-HHMM at run time; or set e.g. 20260827-1505
     - name: registry-url
       value: "quay.io"
     - name: registry-namespace
