@@ -1,0 +1,38 @@
+# Bootable Container: MicroShift on CentOS Stream 9
+# Deploy lightweight Kubernetes at the edge with bootable containers
+#
+# NOTE: MicroShift packages are not available in CentOS Stream.
+# This example shows the structure - for actual MicroShift deployment,
+# use RHEL with a valid subscription, or use k3s as an alternative.
+#
+# BUILD:
+#   podman build -t quay.io/<USER>/bootc-microshift:v1.0 .
+
+FROM quay.io/centos-bootc/centos-bootc:stream9
+
+ARG USER_PASSWD=redhat
+
+# Install base packages
+RUN dnf install -y \
+    firewalld \
+    vim-minimal \
+    tmux \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
+# Enable firewalld
+RUN systemctl enable firewalld
+
+# Create admin user with sudo access (password: redhat)
+RUN useradd -m -G wheel admin && \
+    echo "admin:${USER_PASSWD}" | chpasswd && \
+    echo "%wheel ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/wheel-sudo
+
+# Configure firewall rules (preparation for k3s or similar)
+COPY configure-firewall.sh /usr/local/bin/configure-firewall.sh
+RUN chmod +x /usr/local/bin/configure-firewall.sh
+
+# Labels
+LABEL name="bootc-edge-base" \
+      version="1.0" \
+      description="CentOS Stream 9 bootc base for edge deployments"

@@ -1,0 +1,95 @@
+---
+# VirtualMachine definition for the bootc web server
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: bootc-webserver
+  namespace: bootable-containers-demo
+  labels:
+    app: bootc-webserver
+    vm.kubevirt.io/name: bootc-webserver
+spec:
+  runStrategy: Always
+  template:
+    metadata:
+      labels:
+        app: bootc-webserver
+        vm.kubevirt.io/name: bootc-webserver
+    spec:
+      domain:
+        firmware:
+          bootloader:
+            efi:
+              secureBoot: false
+        cpu:
+          cores: 1
+          sockets: 1
+          threads: 1
+        memory:
+          guest: 2Gi
+        devices:
+          disks:
+            - name: rootdisk
+              disk:
+                bus: virtio
+              bootOrder: 1
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
+          interfaces:
+            - name: default
+              masquerade: {}
+          rng: {}
+        resources:
+          requests:
+            memory: 2Gi
+      networks:
+        - name: default
+          pod: {}
+      terminationGracePeriodSeconds: 180
+      volumes:
+        - name: rootdisk
+          dataVolume:
+            name: bootc-webserver-disk
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            userData: |
+              #cloud-config
+              hostname: bootc-webserver
+              users:
+                - name: rhel
+                  password: R3dH4t1!
+                  groups: wheel
+                  sudo: ALL=(ALL) NOPASSWD:ALL
+                  shell: /bin/bash
+                  lock_passwd: false
+              chpasswd:
+                expire: false
+              ssh_pwauth: true
+---
+# Alternative: Using instancetype and preference (recommended for OCP 4.14+)
+# apiVersion: kubevirt.io/v1
+# kind: VirtualMachine
+# metadata:
+#   name: bootc-webserver-instancetype
+#   namespace: bootable-containers-demo
+# spec:
+#   instancetype:
+#     name: u1.small
+#   preference:
+#     name: rhel.9
+#   runStrategy: Always
+#   template:
+#     spec:
+#       domain:
+#         devices:
+#           interfaces:
+#             - name: default
+#               masquerade: {}
+#       networks:
+#         - name: default
+#           pod: {}
+#       volumes:
+#         - name: rootdisk
+#           dataVolume:
+#             name: bootc-webserver-disk

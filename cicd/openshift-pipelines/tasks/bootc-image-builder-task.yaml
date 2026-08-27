@@ -1,0 +1,106 @@
+---
+# Custom Tekton Task for bootc-image-builder
+# Converts bootc container images to disk images (QCOW2, VMDK, ISO, etc.)
+
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: bootc-image-builder
+  namespace: bootable-containers-cicd
+  labels:
+    app.kubernetes.io/name: bootc-image-builder
+  annotations:
+    tekton.dev/displayName: "bootc-image-builder"
+    tekton.dev/categories: "Image Build"
+    tekton.dev/pipelines.minVersion: "0.50.0"
+spec:
+  description: |
+    Convert a bootc container image to a disk image using bootc-image-builder.
+    Supports QCOW2, VMDK, RAW, ISO, AMI, and other formats.
+
+  params:
+    - name: source-image
+      type: string
+      description: The bootc container image to convert
+
+    - name: output-type
+      type: string
+      description: Output disk image type (qcow2, vmdk, raw, iso, ami)
+      default: "qcow2"
+
+    - name: builder-image
+      type: string
+      description: bootc-image-builder container image
+      default: "quay.io/centos-bootc/bootc-image-builder:latest"
+
+    - name: output-path
+      type: string
+      description: Output path within workspace
+      default: "output"
+
+  workspaces:
+    - name: source
+      description: Workspace containing source and for output
+    - name: dockerconfig
+      description: Docker config for registry authentication
+      optional: true
+
+  results:
+    - name: disk-image-path
+      description: Path to the generated disk image
+
+  stepTemplate:
+    env:
+      - name: DOCKER_CONFIG
+        value: $(workspaces.dockerconfig.path)
+
+  steps:
+    - name: create-output-dir
+      image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+      script: |
+        #!/bin/bash
+        set -e
+        mkdir -p $(workspaces.source.path)/$(params.output-path)
+        echo "Output directory created"
+
+    - name: convert-image
+      image: $(params.builder-image)
+      securityContext:
+        privileged: true
+      script: |
+        #!/bin/bash
+        set -e
+        
+        echo "Converting $(params.source-image) to $(params.output-type)..."
+        
+        # Run bootc-image-builder
+        /usr/bin/bootc-image-builder \
+          --type $(params.output-type) \
+          --output /output \
+          $(params.source-image)
+        
+        # Copy output to workspace
+        cp -r /output/* $(workspaces.source.path)/$(params.output-path)/
+        
+        echo "Conversion complete!"
+        ls -la $(workspaces.source.path)/$(params.output-path)/
+      volumeMounts:
+        - name: containers-storage
+          mountPath: /var/lib/containers/storage
+
+    - name: write-result
+      image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+      script: |
+        #!/bin/bash
+        DISK_PATH="$(workspaces.source.path)/$(params.output-path)/$(params.output-type)/disk.$(params.output-type)"
+        if [ -f "${DISK_PATH}" ]; then
+          echo -n "${DISK_PATH}" | tee $(results.disk-image-path.path)
+        else
+          # Handle qcow2 which outputs to disk.qcow2
+          DISK_PATH="$(workspaces.source.path)/$(params.output-path)/qcow2/disk.qcow2"
+          echo -n "${DISK_PATH}" | tee $(results.disk-image-path.path)
+        fi
+
+  volumes:
+    - name: containers-storage
+      emptyDir: {}

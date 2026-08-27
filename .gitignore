@@ -1,0 +1,29 @@
+# Output directories
+output/
+*/output/
+
+# QCOW2 disk images
+*.qcow2
+*.vmdk
+*.raw
+*.iso
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Secrets (never commit these)
+*.env
+.env.*
+credentials.json
+*-secret.yaml
+
+# Temporary files
+*.tmp
+*.bak

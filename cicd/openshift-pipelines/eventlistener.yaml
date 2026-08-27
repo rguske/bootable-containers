@@ -1,0 +1,163 @@
+---
+# Tekton Triggers for automatic pipeline execution
+# Triggers pipeline on GitHub webhook events
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tekton-triggers-sa
+  namespace: bootable-containers-cicd
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tekton-triggers-rb
+  namespace: bootable-containers-cicd
+subjects:
+  - kind: ServiceAccount
+    name: tekton-triggers-sa
+    namespace: bootable-containers-cicd
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tekton-triggers-eventlistener-roles
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tekton-triggers-crb
+subjects:
+  - kind: ServiceAccount
+    name: tekton-triggers-sa
+    namespace: bootable-containers-cicd
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tekton-triggers-eventlistener-clusterroles
+---
+# TriggerTemplate - defines what to create when triggered
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: bootc-build-template
+  namespace: bootable-containers-cicd
+spec:
+  params:
+    - name: git-url
+      description: The git repository URL
+    - name: git-revision
+      description: The git revision
+      default: main
+    - name: image-tag
+      description: Image tag to use
+      default: latest
+  
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata:
+        generateName: bootc-build-triggered-
+        namespace: bootable-containers-cicd
+      spec:
+        pipelineRef:
+          name: bootc-build-deploy
+        params:
+          - name: git-url
+            value: $(tt.params.git-url)
+          - name: git-revision
+            value: $(tt.params.git-revision)
+          - name: image-tag
+            value: $(tt.params.image-tag)
+          - name: image-name
+            value: bootc-webserver
+          - name: registry-url
+            value: quay.io
+          - name: registry-namespace
+            value: YOUR_USERNAME
+        workspaces:
+          - name: source
+            volumeClaimTemplate:
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 5Gi
+          - name: dockerconfig
+            secret:
+              secretName: registry-credentials
+---
+# TriggerBinding - extracts values from webhook payload
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: github-push-binding
+  namespace: bootable-containers-cicd
+spec:
+  params:
+    - name: git-url
+      value: $(body.repository.clone_url)
+    - name: git-revision
+      value: $(body.head_commit.id)
+    - name: image-tag
+      value: $(body.head_commit.id)
+---
+# EventListener - receives webhooks and triggers pipelines
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: bootc-webhook-listener
+  namespace: bootable-containers-cicd
+spec:
+  serviceAccountName: tekton-triggers-sa
+  triggers:
+    - name: github-push-trigger
+      interceptors:
+        - ref:
+            name: github
+            kind: ClusterInterceptor
+          params:
+            - name: secretRef
+              value:
+                secretName: github-webhook-secret
+                secretKey: webhook-secret
+            - name: eventTypes
+              value:
+                - push
+        - ref:
+            name: cel
+            kind: ClusterInterceptor
+          params:
+            - name: filter
+              value: |
+                body.ref == 'refs/heads/main' &&
+                body.commits.exists(c, c.modified.exists(f, f.startsWith('demos/')))
+      bindings:
+        - ref: github-push-binding
+      template:
+        ref: bootc-build-template
+---
+# Route to expose the EventListener
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: bootc-webhook
+  namespace: bootable-containers-cicd
+spec:
+  to:
+    kind: Service
+    name: el-bootc-webhook-listener
+  port:
+    targetPort: http-listener
+  tls:
+    termination: edge
+---
+# Secret for GitHub webhook validation
+apiVersion: v1
+kind: Secret
+metadata:
+  name: github-webhook-secret
+  namespace: bootable-containers-cicd
+type: Opaque
+stringData:
+  webhook-secret: "YOUR_WEBHOOK_SECRET"

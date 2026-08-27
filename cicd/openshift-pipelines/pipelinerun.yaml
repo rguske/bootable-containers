@@ -1,0 +1,71 @@
+---
+# Example PipelineRun for bootc-build-deploy pipeline
+# Customize the parameters for your environment
+
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: bootc-build-deploy-run-
+  namespace: bootable-containers-cicd
+  labels:
+    app.kubernetes.io/name: bootc-pipeline
+spec:
+  pipelineRef:
+    name: bootc-build-deploy
+  
+  params:
+    - name: git-url
+      value: "https://github.com/YOUR_ORG/bootable-containers.git"
+    - name: git-revision
+      value: "main"
+    - name: image-name
+      value: "bootc-webserver"
+    - name: image-tag
+      value: "v1.0"
+    - name: registry-url
+      value: "quay.io"
+    - name: registry-namespace
+      value: "YOUR_USERNAME"
+    - name: target-namespace
+      value: "bootable-containers-demo"
+  
+  workspaces:
+    - name: source
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 5Gi
+    
+    - name: dockerconfig
+      secret:
+        secretName: registry-credentials
+
+  taskRunTemplate:
+    serviceAccountName: pipeline
+    podTemplate:
+      securityContext:
+        fsGroup: 65532
+---
+# Secret for registry credentials
+# Create with: oc create secret docker-registry registry-credentials ...
+apiVersion: v1
+kind: Secret
+metadata:
+  name: registry-credentials
+  namespace: bootable-containers-cicd
+type: kubernetes.io/dockerconfigjson
+stringData:
+  .dockerconfigjson: |
+    {
+      "auths": {
+        "quay.io": {
+          "auth": "BASE64_ENCODED_USERNAME:PASSWORD"
+        },
+        "registry.redhat.io": {
+          "auth": "BASE64_ENCODED_USERNAME:PASSWORD"
+        }
+      }
+    }

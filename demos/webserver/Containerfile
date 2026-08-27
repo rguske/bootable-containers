@@ -1,0 +1,38 @@
+# Bootable Container: Apache HTTPD Web Server
+# Base image: CentOS Stream 9 bootc
+#
+# BUILD:
+#   export USERNAME=<your-quay-username>
+#   podman build -t quay.io/${USERNAME}/bootc-webserver:v1.0 .
+
+FROM quay.io/centos-bootc/centos-bootc:stream9
+
+# Update system and install required packages
+RUN dnf -y update && \
+    dnf -y install tmux httpd vim-minimal && \
+    dnf clean all && \
+    rm -rf /var/cache/dnf
+
+# Create a user with password (password: redhat)
+RUN useradd -m -G wheel bootc-user && \
+    echo 'bootc-user:redhat' | chpasswd
+
+# Configure passwordless sudo for wheel group
+RUN echo "%wheel        ALL=(ALL)       NOPASSWD: ALL" > /etc/sudoers.d/wheel-sudo
+
+# Configure Apache
+# Move /var/www to /usr/share/www for immutability
+RUN systemctl enable httpd && \
+    mv /var/www /usr/share/www && \
+    sed -i 's,/var/www,/usr/share/www,' /etc/httpd/conf/httpd.conf
+
+# Add custom content
+COPY index.html /usr/share/www/html/index.html
+
+# Expose HTTP port
+EXPOSE 80
+
+# Labels for image identification
+LABEL name="bootc-webserver" \
+      version="1.0" \
+      description="CentOS Stream 9 bootc-based Apache web server"

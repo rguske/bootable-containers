@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bootable Container Demo</title>
+    <!-- PatternFly 6 CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/@patternfly/patternfly@6/patternfly.min.css">
+    <style>
+        :root {
+            --rh-red: #ee0000;
+            --rh-red-dark: #a30000;
+            --rh-red-light: #ff4d4d;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%);
+            min-height: 100vh;
+            font-size: 18px;
+        }
+        
+        .pf-v6-l-bullseye {
+            min-height: 100vh;
+            padding: var(--pf-t--global--spacer--lg);
+        }
+        
+        .demo-card {
+            max-width: 650px;
+            width: 100%;
+        }
+        
+        .pf-v6-c-card {
+            --pf-v6-c-card--BackgroundColor: rgba(30, 30, 30, 0.95);
+            border: 2px solid var(--rh-red);
+            box-shadow: 0 0 40px rgba(238, 0, 0, 0.3);
+        }
+        
+        .demo-header {
+            text-align: center;
+            padding: var(--pf-t--global--spacer--xl) 0;
+            background: linear-gradient(180deg, rgba(238, 0, 0, 0.1) 0%, transparent 100%);
+            border-radius: var(--pf-t--global--border--radius--medium) var(--pf-t--global--border--radius--medium) 0 0;
+        }
+        
+        .demo-emoji {
+            font-size: 5rem;
+            margin-bottom: var(--pf-t--global--spacer--md);
+            filter: drop-shadow(0 0 20px rgba(238, 0, 0, 0.6));
+        }
+        
+        .demo-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #ffffff;
+            margin: 0;
+            text-shadow: 0 0 20px rgba(238, 0, 0, 0.5);
+        }
+        
+        .demo-title span {
+            color: var(--rh-red);
+        }
+        
+        .demo-subtitle {
+            color: #cccccc;
+            font-size: 1.1rem;
+            margin-top: var(--pf-t--global--spacer--sm);
+        }
+        
+        .pf-v6-c-card__body {
+            color: #e0e0e0;
+        }
+        
+        .info-section {
+            background: rgba(238, 0, 0, 0.05);
+            border-radius: var(--pf-t--global--border--radius--medium);
+            padding: var(--pf-t--global--spacer--md);
+            margin-bottom: var(--pf-t--global--spacer--md);
+            border-left: 3px solid var(--rh-red);
+        }
+        
+        .info-section h3 {
+            color: var(--rh-red) !important;
+            font-weight: 600;
+            font-size: 1.3rem;
+            margin-top: 0;
+            margin-bottom: var(--pf-t--global--spacer--sm);
+        }
+        
+        .info-section p {
+            color: #e0e0e0;
+            margin: 0;
+            line-height: 1.7;
+            font-size: 1.1rem;
+        }
+        
+        .info-section code {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--rh-red-light);
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        
+        .pf-v6-c-list__item {
+            color: #e0e0e0 !important;
+            padding: var(--pf-t--global--spacer--sm) 0;
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+        
+        .pf-v6-c-list__item-icon {
+            color: var(--rh-red) !important;
+        }
+        
+        .pf-v6-c-list__item strong {
+            color: #ffffff;
+        }
+        
+        .pf-v6-c-label.pf-m-red {
+            --pf-v6-c-label--BackgroundColor: var(--rh-red);
+            --pf-v6-c-label__content--Color: #ffffff;
+        }
+        
+        .demo-footer {
+            text-align: center;
+            padding-top: var(--pf-t--global--spacer--lg);
+            border-top: 1px solid rgba(238, 0, 0, 0.2);
+            margin-top: var(--pf-t--global--spacer--lg);
+        }
+        
+        .demo-footer p {
+            color: #888;
+            font-size: 0.9rem;
+            margin: 0;
+        }
+        
+        .demo-footer a {
+            color: var(--rh-red);
+            text-decoration: none;
+        }
+        
+        .demo-footer a:hover {
+            text-decoration: underline;
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .labels-container {
+            margin-top: var(--pf-t--global--spacer--lg);
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="pf-v6-l-bullseye">
+        <div class="pf-v6-l-bullseye__item demo-card">
+            <div class="pf-v6-c-card">
+                <div class="demo-header">
+                    <div class="demo-emoji pulse">🚀</div>
+                    <h1 class="demo-title"><span>Bootable</span> Container</h1>
+                    <p class="demo-subtitle">The Operating System as a Container Image</p>
+                </div>
+                
+                <div class="pf-v6-c-card__body">
+                    <!-- What is this? Box -->
+                    <div class="info-section">
+                        <h3>What is this?</h3>
+                        <p>This web server runs on a <strong>bootable container</strong> — an immutable, 
+                           container-based operating system. The entire OS is defined in a 
+                           <code>Containerfile</code>, built with <code>podman</code>, and can boot 
+                           on bare metal, VMs, or cloud infrastructure.</p>
+                    </div>
+                    
+                    <!-- Key Features Box -->
+                    <div class="info-section">
+                        <h3>Key Features</h3>
+                        <ul class="pf-v6-c-list" role="list" style="margin: 0; padding-left: 0;">
+                            <li class="pf-v6-c-list__item">
+                                <span class="pf-v6-c-list__item-icon">
+                                    <svg class="pf-v6-svg" viewBox="0 0 512 512" fill="currentColor" width="1em" height="1em"><path d="M173.898 439.404l-166.4-166.4c-9.997-9.997-9.997-26.206 0-36.204l36.203-36.204c9.997-9.998 26.207-9.998 36.204 0L192 312.69 432.095 72.596c9.997-9.997 26.207-9.997 36.204 0l36.203 36.204c9.997 9.997 9.997 26.206 0 36.204l-294.4 294.401c-9.998 9.997-26.207 9.997-36.204-.001z"></path></svg>
+                                </span>
+                                <strong>Immutable</strong> — Root filesystem is read-only
+                            </li>
+                            <li class="pf-v6-c-list__item">
+                                <span class="pf-v6-c-list__item-icon">
+                                    <svg class="pf-v6-svg" viewBox="0 0 512 512" fill="currentColor" width="1em" height="1em"><path d="M173.898 439.404l-166.4-166.4c-9.997-9.997-9.997-26.206 0-36.204l36.203-36.204c9.997-9.998 26.207-9.998 36.204 0L192 312.69 432.095 72.596c9.997-9.997 26.207-9.997 36.204 0l36.203 36.204c9.997 9.997 9.997 26.206 0 36.204l-294.4 294.401c-9.998 9.997-26.207 9.997-36.204-.001z"></path></svg>
+                                </span>
+                                <strong>Atomic Updates</strong> — OS updates as a single unit
+                            </li>
+                            <li class="pf-v6-c-list__item">
+                                <span class="pf-v6-c-list__item-icon">
+                                    <svg class="pf-v6-svg" viewBox="0 0 512 512" fill="currentColor" width="1em" height="1em"><path d="M173.898 439.404l-166.4-166.4c-9.997-9.997-9.997-26.206 0-36.204l36.203-36.204c9.997-9.998 26.207-9.998 36.204 0L192 312.69 432.095 72.596c9.997-9.997 26.207-9.997 36.204 0l36.203 36.204c9.997 9.997 9.997 26.206 0 36.204l-294.4 294.401c-9.998 9.997-26.207 9.997-36.204-.001z"></path></svg>
+                                </span>
+                                <strong>Rollback</strong> — Instantly revert to previous version
+                            </li>
+                            <li class="pf-v6-c-list__item">
+                                <span class="pf-v6-c-list__item-icon">
+                                    <svg class="pf-v6-svg" viewBox="0 0 512 512" fill="currentColor" width="1em" height="1em"><path d="M173.898 439.404l-166.4-166.4c-9.997-9.997-9.997-26.206 0-36.204l36.203-36.204c9.997-9.998 26.207-9.998 36.204 0L192 312.69 432.095 72.596c9.997-9.997 26.207-9.997 36.204 0l36.203 36.204c9.997 9.997 9.997 26.206 0 36.204l-294.4 294.401c-9.998 9.997-26.207 9.997-36.204-.001z"></path></svg>
+                                </span>
+                                <strong>Portable</strong> — Deploy anywhere: bare metal, KVM, VMware, cloud
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Labels -->
+                    <div class="labels-container">
+                        <div class="pf-v6-l-flex pf-m-gap-sm pf-m-wrap pf-m-justify-content-center">
+                            <span class="pf-v6-c-label pf-m-red">
+                                <span class="pf-v6-c-label__content">bootc</span>
+                            </span>
+                            <span class="pf-v6-c-label pf-m-blue">
+                                <span class="pf-v6-c-label__content">Podman</span>
+                            </span>
+                            <span class="pf-v6-c-label pf-m-green">
+                                <span class="pf-v6-c-label__content">systemd</span>
+                            </span>
+                            <span class="pf-v6-c-label pf-m-purple">
+                                <span class="pf-v6-c-label__content">Apache httpd</span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="pf-v6-c-card__footer demo-footer">
+                    <p>Powered by <a href="https://github.com/containers/bootc" target="_blank">bootc</a> — 
+                       Built with <a href="https://podman.io" target="_blank">Podman</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

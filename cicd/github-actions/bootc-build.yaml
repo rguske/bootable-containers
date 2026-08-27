@@ -1,0 +1,195 @@
+# GitHub Actions Workflow for Bootable Containers
+# Copy this file to .github/workflows/bootc-build.yaml in your repository
+
+name: Build Bootable Container
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'demos/webserver/**'
+      - '.github/workflows/bootc-build.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'demos/webserver/**'
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to use'
+        required: false
+        default: 'latest'
+
+env:
+  REGISTRY: quay.io
+  IMAGE_NAME: bootc-webserver
+  # Set your username in repository secrets
+  REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+
+jobs:
+  build-bootc-image:
+    name: Build Bootable Container Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tag }}
+      image_digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up image tag
+        id: meta
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.image_tag }}"
+          elif [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            TAG="latest"
+          else
+            TAG="${{ github.sha }}"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "full_image=${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/${{ env.IMAGE_NAME }}:${TAG}" >> $GITHUB_OUTPUT
+
+      - name: Log in to Container Registry
+        uses: redhat-actions/podman-login@v1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build bootc container image
+        id: build
+        uses: redhat-actions/buildah-build@v2
+        with:
+          image: ${{ env.IMAGE_NAME }}
+          tags: ${{ steps.meta.outputs.tag }}
+          containerfiles: |
+            ./demos/webserver/Containerfile
+          context: ./demos/webserver
+
+      - name: Push to registry
+        id: push
+        uses: redhat-actions/push-to-registry@v2
+        with:
+          image: ${{ steps.build.outputs.image }}
+          tags: ${{ steps.meta.outputs.tag }}
+          registry: ${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}
+
+      - name: Print image URL
+        run: |
+          echo "Image pushed to: ${{ steps.push.outputs.registry-paths }}"
+
+  convert-to-qcow2:
+    name: Convert to QCOW2 (x86_64)
+    needs: build-bootc-image
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: redhat-actions/podman-login@v1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Create output directory
+        run: mkdir -p demos/webserver/output
+
+      - name: Convert to QCOW2 using bootc-image-builder
+        run: |
+          sudo podman run \
+            --rm \
+            --privileged \
+            --pull=newer \
+            --security-opt label=type:unconfined_t \
+            -v "$PWD/demos/webserver/output":/output \
+            -v /var/lib/containers/storage:/var/lib/containers/storage \
+            quay.io/centos-bootc/bootc-image-builder:latest \
+            --type qcow2 \
+            ${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/${{ env.IMAGE_NAME }}:${{ needs.build-bootc-image.outputs.image_tag }}
+
+      - name: Verify QCOW2 created
+        run: |
+          ls -lh demos/webserver/output/qcow2/
+          file demos/webserver/output/qcow2/disk.qcow2
+
+      - name: Build disk container image
+        uses: redhat-actions/buildah-build@v2
+        with:
+          image: ${{ env.IMAGE_NAME }}
+          tags: ${{ needs.build-bootc-image.outputs.image_tag }}-disk
+          containerfiles: |
+            ./demos/webserver/Containerfile.ocpv
+          context: ./demos/webserver
+
+      - name: Push disk image to registry
+        uses: redhat-actions/push-to-registry@v2
+        with:
+          image: ${{ env.IMAGE_NAME }}
+          tags: ${{ needs.build-bootc-image.outputs.image_tag }}-disk
+          registry: ${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}
+
+      - name: Print disk image URL
+        run: |
+          echo "Disk image pushed to: ${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/${{ env.IMAGE_NAME }}:${{ needs.build-bootc-image.outputs.image_tag }}-disk"
+          echo ""
+          echo "This x86_64 QCOW2 can be used on OpenShift Virtualization"
+
+  deploy-to-openshift:
+    name: Deploy to OpenShift Virtualization
+    needs: [build-bootc-image, convert-to-qcow2]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install OpenShift CLI
+        uses: redhat-actions/openshift-tools-installer@v1
+        with:
+          oc: latest
+
+      - name: Log in to OpenShift
+        uses: redhat-actions/oc-login@v1
+        with:
+          openshift_server_url: ${{ secrets.OPENSHIFT_SERVER }}
+          openshift_token: ${{ secrets.OPENSHIFT_TOKEN }}
+          insecure_skip_tls_verify: true
+
+      - name: Update DataVolume with new image
+        run: |
+          IMAGE_URL="docker://${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/${{ env.IMAGE_NAME }}:${{ needs.build-bootc-image.outputs.image_tag }}-disk"
+          
+          # Update the DataVolume
+          sed -i "s|docker://quay.io/YOUR_USERNAME/bootc-webserver:v1.0-disk|${IMAGE_URL}|g" \
+            openshift-virtualization/datavolume.yaml
+
+      - name: Apply OpenShift resources
+        run: |
+          oc apply -f openshift-virtualization/namespace.yaml
+          oc apply -f openshift-virtualization/datavolume.yaml
+          oc apply -f openshift-virtualization/virtualmachine.yaml
+          oc apply -f openshift-virtualization/service.yaml
+          oc apply -f openshift-virtualization/route.yaml
+
+      - name: Wait for VM to be ready
+        run: |
+          oc wait --for=condition=Ready vm/bootc-webserver \
+            -n bootable-containers-demo \
+            --timeout=600s || echo "VM may still be starting..."
+
+      - name: Get route URL
+        run: |
+          ROUTE_URL=$(oc get route bootc-webserver -n bootable-containers-demo -o jsonpath='{.spec.host}')
+          echo "Application deployed at: https://${ROUTE_URL}"

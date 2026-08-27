@@ -1,0 +1,102 @@
+---
+# ArgoCD Application for Bootable Container VM deployment
+# Automatically syncs VM configuration from Git
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: bootc-webserver
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/name: bootc-webserver
+    app.kubernetes.io/part-of: bootable-containers
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  
+  source:
+    repoURL: https://github.com/YOUR_ORG/bootable-containers.git
+    targetRevision: main
+    path: openshift-virtualization
+    
+    # Use Kustomize for templating
+    kustomize:
+      # Override image tag dynamically
+      images:
+        - quay.io/YOUR_USERNAME/bootc-webserver=quay.io/YOUR_USERNAME/bootc-webserver:latest-disk
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: bootable-containers-demo
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Health checks for VirtualMachine resources
+  ignoreDifferences:
+    - group: kubevirt.io
+      kind: VirtualMachine
+      jsonPointers:
+        - /spec/template/spec/domain/resources
+        - /status
+---
+# ApplicationSet for multi-environment deployment
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: bootc-webserver-envs
+  namespace: openshift-gitops
+spec:
+  generators:
+    - list:
+        elements:
+          - env: dev
+            namespace: bootable-containers-dev
+            imageTag: develop
+          - env: staging
+            namespace: bootable-containers-staging
+            imageTag: latest
+          - env: prod
+            namespace: bootable-containers-prod
+            imageTag: stable
+  
+  template:
+    metadata:
+      name: 'bootc-webserver-{{env}}'
+      namespace: openshift-gitops
+      labels:
+        app.kubernetes.io/name: bootc-webserver
+        environment: '{{env}}'
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/YOUR_ORG/bootable-containers.git
+        targetRevision: main
+        path: openshift-virtualization
+        kustomize:
+          images:
+            - 'quay.io/YOUR_USERNAME/bootc-webserver=quay.io/YOUR_USERNAME/bootc-webserver:{{imageTag}}-disk'
+          namePrefix: '{{env}}-'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{namespace}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

@@ -1,0 +1,14 @@
+# Kustomization for GitOps resources
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: openshift-gitops
+
+resources:
+  - application.yaml
+  # Uncomment for automatic image updates
+  # - image-updater.yaml
+
+commonLabels:
+  app.kubernetes.io/managed-by: argocd
+  app.kubernetes.io/part-of: bootable-containers

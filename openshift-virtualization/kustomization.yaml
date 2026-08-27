@@ -1,0 +1,65 @@
+# Kustomization for bootable container OpenShift Virtualization deployment
+#
+# USAGE:
+#   1. Edit the patches below with your values
+#   2. Run: oc apply -k .
+#
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: bootable-containers-demo
+
+resources:
+  - namespace.yaml
+  - datavolume.yaml
+  - virtualmachine.yaml
+  - service.yaml
+  - route.yaml
+  # Uncomment for automatic updates
+  #- datasource.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: bootc-webserver
+      app.kubernetes.io/component: bootable-container
+      app.kubernetes.io/part-of: bootable-containers-demo
+
+# ============================================================
+# EDIT THESE VALUES BEFORE DEPLOYING
+# Replace rguske and kubevirt-odf-replica-two-block with your values
+# ============================================================
+patches:
+  # Set your registry username
+  - patch: |-
+      - op: replace
+        path: /spec/source/registry/url
+        value: "docker://quay.io/rguske/bootc-webserver:v1.0-disk"
+    target:
+      kind: DataVolume
+      name: bootc-webserver-disk
+
+  # Set your storage class (run: oc get sc)
+  - patch: |-
+      - op: replace
+        path: /spec/pvc/storageClassName
+        value: "kubevirt-odf-replica-two-block"
+    target:
+      kind: DataVolume
+      name: bootc-webserver-disk
+
+  # Patches for DataImportCron (only applied if datasource.yaml is uncommented)
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/source/registry/url
+        value: "docker://quay.io/rguske/bootc-webserver:v1.0-disk"
+    target:
+      kind: DataImportCron
+      name: bootc-webserver-cron
+
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/storage/storageClassName
+        value: "kubevirt-odf-replica-two-block"
+    target:
+      kind: DataImportCron
+      name: bootc-webserver-cron

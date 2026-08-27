@@ -1,0 +1,8 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bootable-containers-demo
+  labels:
+    app.kubernetes.io/name: bootable-containers
+    app.kubernetes.io/component: demo

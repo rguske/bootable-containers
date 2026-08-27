@@ -1,0 +1,30 @@
+---
+# DataVolume for importing the bootc disk image
+# This creates a PVC and imports the QCOW2 image from the container registry
+#
+# BEFORE APPLYING:
+#   1. Replace rguske with your registry username
+#   2. Replace kubevirt-ceph-rbd-virt with your cluster's storage class (run: oc get sc)
+#   3. Uncomment secretRef if using a private registry
+#
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: DataVolume
+metadata:
+  name: bootc-webserver-disk
+  namespace: bootable-containers-demo
+  labels:
+    app: bootc-webserver
+spec:
+  source:
+    registry:
+      url: "docker://quay.io/YOUR_USERNAME/bootc-webserver:v1.0-disk"
+      # Uncomment if using a private registry
+      # secretRef: quay-pull-secret
+  pvc:
+    accessModes:
+      - ReadWriteMany
+    volumeMode: Block
+    resources:
+      requests:
+        storage: 20Gi
+    storageClassName: kubevirt-ceph-rbd-virt

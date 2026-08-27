@@ -1,0 +1,53 @@
+---
+# DataSource for automatic bootable container updates
+# This creates a scheduled import that refreshes the boot source periodically
+#
+# BEFORE APPLYING:
+#   1. Replace YOUR_USERNAME with your registry username
+#   2. Replace STORAGE_CLASS with your cluster's storage class (run: oc get sc)
+#
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: DataSource
+metadata:
+  name: bootc-webserver
+  namespace: bootable-containers-demo
+  labels:
+    app: bootc-webserver
+    cdi.kubevirt.io/dataImportCron: bootc-webserver
+spec:
+  source:
+    pvc:
+      name: bootc-webserver-disk
+      namespace: bootable-containers-demo
+---
+# DataImportCron for scheduled updates
+# Automatically imports new versions of the bootable container image
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: DataImportCron
+metadata:
+  name: bootc-webserver-cron
+  namespace: bootable-containers-demo
+  labels:
+    app: bootc-webserver
+spec:
+  # Run every 2 hours
+  schedule: "0 */2 * * *"
+  garbageCollect: Outdated
+  importsToKeep: 3
+  managedDataSource: bootc-webserver
+  template:
+    spec:
+      source:
+        registry:
+          # Replace with your registry URL
+          url: "docker://quay.io/rguske/bootc-webserver:v1.0-disk"
+          # Uncomment if using a private registry
+          # secretRef: registry-credentials
+      storage:
+        accessModes:
+          - ReadWriteMany
+        volumeMode: Block
+        resources:
+          requests:
+            storage: 20Gi
+        storageClassName: kubevirt-ceph-rbd-virt

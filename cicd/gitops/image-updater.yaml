@@ -1,0 +1,56 @@
+---
+# ArgoCD Image Updater configuration
+# Automatically updates application when new container images are pushed
+
+# ConfigMap for Image Updater registries
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-image-updater-config
+  namespace: openshift-gitops
+data:
+  registries.conf: |
+    registries:
+      - name: Quay
+        api_url: https://quay.io
+        prefix: quay.io
+        credentials: pullsecret:openshift-gitops/quay-credentials
+        default: true
+      - name: RedHat
+        api_url: https://registry.redhat.io
+        prefix: registry.redhat.io
+        credentials: pullsecret:openshift-gitops/redhat-registry-credentials
+---
+# Application with Image Updater annotations
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: bootc-webserver-auto-update
+  namespace: openshift-gitops
+  annotations:
+    # ArgoCD Image Updater annotations
+    argocd-image-updater.argoproj.io/image-list: |
+      disk=quay.io/YOUR_USERNAME/bootc-webserver
+    argocd-image-updater.argoproj.io/disk.update-strategy: semver
+    argocd-image-updater.argoproj.io/disk.allow-tags: regexp:^v[0-9]+\.[0-9]+\.[0-9]+-disk$
+    argocd-image-updater.argoproj.io/write-back-method: git
+    argocd-image-updater.argoproj.io/git-branch: main
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/YOUR_ORG/bootable-containers.git
+    targetRevision: main
+    path: openshift-virtualization
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: bootable-containers-demo
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+---
+# Secret for registry credentials (create separately)
+# oc create secret generic quay-credentials \
+#   --from-literal=username=YOUR_USERNAME \
+#   --from-literal=password=YOUR_PASSWORD \
+#   -n openshift-gitops

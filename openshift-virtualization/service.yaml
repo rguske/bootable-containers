@@ -1,0 +1,19 @@
+---
+# Service to expose the web server running in the VM
+apiVersion: v1
+kind: Service
+metadata:
+  name: bootc-webserver
+  namespace: bootable-containers-demo
+  labels:
+    app: bootc-webserver
+spec:
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 80
+  selector:
+    # This selector matches the VM pod
+    vm.kubevirt.io/name: bootc-webserver
+  type: ClusterIP

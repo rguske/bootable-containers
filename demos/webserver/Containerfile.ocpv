@@ -1,0 +1,20 @@
+# Containerfile for packaging QCOW2 disk image for OpenShift Virtualization
+# This creates a container that holds the disk image for import into OCP-V
+
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest AS builder
+
+# Add the QCOW2 disk image (built by bootc-image-builder)
+# The disk image should be at output/qcow2/disk.qcow2
+ADD --chown=107:107 output/qcow2/disk.qcow2 /disk/
+
+# Set appropriate permissions
+RUN chmod 0440 /disk/*
+
+# Create minimal final image with just the disk
+FROM scratch
+COPY --from=builder /disk/* /disk/
+
+# Labels for identification
+LABEL name="bootc-webserver-disk" \
+      version="1.0" \
+      description="QCOW2 disk image for OpenShift Virtualization"
