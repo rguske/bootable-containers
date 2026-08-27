@@ -405,6 +405,10 @@ oc get dv -n bootable-containers-demo -w
 oc get route bootc-webserver -n bootable-containers-demo -o jsonpath='{.spec.host}'
 ```
 
+Once deployed, access the web server via the route URL:
+
+![Bootable Container Web Server](static/webpage.png)
+
 ### VM Credentials
 
 - **User**: `rhel`
