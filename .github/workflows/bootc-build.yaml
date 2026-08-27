@@ -101,6 +101,13 @@ jobs:
       - name: Create output directory
         run: mkdir -p demos/webserver/output
 
+      - name: Pull bootc image into host storage
+        run: |
+          # bootc-image-builder no longer pulls; it only sees images in
+          # rootful storage via -v /var/lib/containers/storage
+          sudo podman pull \
+            ${{ env.REGISTRY }}/${{ env.REGISTRY_USERNAME }}/${{ env.IMAGE_NAME }}:${{ needs.build-bootc-image.outputs.image_tag }}
+
       - name: Convert to QCOW2 using bootc-image-builder
         run: |
           sudo podman run \
