@@ -9,6 +9,7 @@ resources:
   # Uncomment for automatic image updates
   # - image-updater.yaml
 
-commonLabels:
-  app.kubernetes.io/managed-by: argocd
-  app.kubernetes.io/part-of: bootable-containers
+labels:
+  - pairs:
+      app.kubernetes.io/managed-by: argocd
+      app.kubernetes.io/part-of: bootable-containers

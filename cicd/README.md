@@ -138,8 +138,10 @@ Replace `YOUR_ORG` and `YOUR_USERNAME` in `gitops/application.yaml` (`repoURL`, 
 - `STORAGE_CLASS` has no such override. It only exists inside `openshift-virtualization/kustomization.yaml`'s `patches:` (`spec/pvc/storageClassName`), so it must already be correct there before the first sync. `DataVolume.spec.pvc.storageClassName` is immutable, so changing it later means deleting the `DataVolume` (and the `VirtualMachine` using it) before ArgoCD can self-heal it back with a new value.
 
 ```bash
-oc apply -f gitops/application.yaml
+oc apply -k gitops/
 ```
+
+`gitops/kustomization.yaml` just wraps `application.yaml` (adds `app.kubernetes.io/managed-by`/`part-of` labels and the `openshift-gitops` namespace) — same pattern as `openshift-pipelines/` and `openshift-virtualization/`. Uncomment `image-updater.yaml` there once you're ready for automatic tag updates.
 
 ## Environment Variables
 
