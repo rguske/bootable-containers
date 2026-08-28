@@ -1,0 +1,69 @@
+---
+# Additional cluster-scoped permissions for OpenShift GitOps (ArgoCD).
+#
+# Why this is needed: the default openshift-gitops-argocd-application-controller
+# and openshift-gitops-argocd-server ServiceAccounts can only manage resource
+# kinds whose ClusterRoles are aggregated into the standard admin/edit roles
+# (rbac.authorization.k8s.io/aggregate-to-admin: "true"). On this cluster,
+# KubeVirt/CDI CRDs (VirtualMachine, DataVolume) and Route aren't aggregated
+# that way, so ArgoCD's sync fails to create/update/prune them without an
+# explicit grant. Confirmed: without this binding, syncing gitops/application.yaml
+# leaves VirtualMachine/DataVolume/Route resources permanently OutOfSync/Missing.
+#
+# Trimmed to only what this project's Applications manage (openshift-virtualization/).
+# Adapted from a broader multi-operator version at:
+# https://github.com/rguske/jarvislab/tree/main/manifest/gitops
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: bootc-gitops-privileges
+rules:
+  - apiGroups:
+      - kubevirt.io
+    resources:
+      - virtualmachines
+    verbs:
+      - create
+      - patch
+      - delete
+  - apiGroups:
+      - cdi.kubevirt.io
+    resources:
+      - datavolumes
+      - storageprofiles
+    verbs:
+      - create
+      - patch
+      - delete
+  - apiGroups:
+      - route.openshift.io
+    resources:
+      - routes
+    verbs:
+      - create
+      - patch
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - services
+    verbs:
+      - create
+      - patch
+      - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: bootc-gitops-privileges
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: bootc-gitops-privileges
+subjects:
+  - kind: ServiceAccount
+    name: openshift-gitops-argocd-application-controller
+    namespace: openshift-gitops
+  - kind: ServiceAccount
+    name: openshift-gitops-argocd-server
+    namespace: openshift-gitops

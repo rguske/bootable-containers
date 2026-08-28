@@ -128,20 +128,33 @@ Ultimately:
 
 ### GitOps
 
-Pin the disk image to a UTC date-time tag (for example `20260827-1505-disk`), not `latest`.
+> **Note:** ArgoCD's default RBAC can't manage `VirtualMachine`/`DataVolume`/`Route` on this cluster. `gitops/rbac.yaml` (applied in step 1) fixes that — see below.
 
-Replace `YOUR_ORG` and `YOUR_USERNAME` in `gitops/application.yaml` (`repoURL`, image pin) and `gitops/image-updater.yaml` (`image-list`, `repoURL`).
+Deploys a single `Application` (`bootc-webserver` → `bootable-containers-gitops`) — deliberately a different namespace from the manual "Demo 3" deployment in the top-level README (`bootable-containers-demo`), so the two don't fight over the same `VirtualMachine`. Image tags use UTC `YYYYMMDD-HHMM`, never `latest` — pin the disk image to something like `20260827-1505-disk`.
 
-`IMAGE_TAG` and `STORAGE_CLASS` are **not** set the same way. `application.yaml`'s `source.path` points at `openshift-virtualization/` (not this `gitops/` directory), and ArgoCD runs `kustomize build` on it as-is:
+1. Apply the RBAC fix and the `Application`:
 
-- `IMAGE_TAG` *is* overridable per `Application`, via `source.kustomize.images` in `application.yaml` — that's the `...bootc-webserver:20260827-1505-disk` line.
-- `STORAGE_CLASS` has no such override. It only exists inside `openshift-virtualization/kustomization.yaml`'s `patches:` (`spec/pvc/storageClassName`), so it must already be correct there before the first sync. `DataVolume.spec.pvc.storageClassName` is immutable, so changing it later means deleting the `DataVolume` (and the `VirtualMachine` using it) before ArgoCD can self-heal it back with a new value.
+   ```bash
+   oc apply -k gitops/
+   ```
 
-```bash
-oc apply -k gitops/
-```
+   `gitops/kustomization.yaml` applies `rbac.yaml` and `application.yaml` together, the same `-k` pattern as `openshift-pipelines/` and `openshift-virtualization/`. `rbac.yaml` is required: the default `openshift-gitops-argocd-application-controller`/`-server` ServiceAccounts can only manage resource kinds aggregated into the standard `admin`/`edit` ClusterRoles, and `VirtualMachine`, `DataVolume`, and `Route` aren't — without this grant they stay permanently `OutOfSync`/`Missing`.
 
-`gitops/kustomization.yaml` just wraps `application.yaml` (adds `app.kubernetes.io/managed-by`/`part-of` labels and the `openshift-gitops` namespace) — same pattern as `openshift-pipelines/` and `openshift-virtualization/`. Uncomment `image-updater.yaml` there once you're ready for automatic tag updates.
+   Trimmed down from a broader multi-operator version at [rguske/jarvislab](https://github.com/rguske/jarvislab/tree/main/manifest/gitops); extend `rbac.yaml` the same way if your cluster has other CRDs with the same gap, rather than granting cluster-admin. Uncomment `image-updater.yaml` in `kustomization.yaml` once you're ready for automatic tag updates.
+
+2. Replace placeholders. `YOUR_ORG` and `YOUR_USERNAME` are literal strings in the YAML, not cluster variables.
+
+   | File | Field | Placeholder |
+   |------|--------|-------------|
+   | `gitops/application.yaml` | `repoURL`, image pin | `YOUR_ORG`, `YOUR_USERNAME` |
+   | `gitops/image-updater.yaml` | `repoURL`, `image-list` | `YOUR_ORG`, `YOUR_USERNAME` |
+
+3. Know where each variable actually lives. `application.yaml`'s `source.path` points at `openshift-virtualization/` (not this `gitops/` directory), and ArgoCD runs `kustomize build` on it as-is:
+
+   - `IMAGE_TAG` *is* overridable per `Application`, via `source.kustomize.images` in `application.yaml` — that's the `...bootc-webserver:20260827-1505-disk` line.
+   - `STORAGE_CLASS` has no such override. It only exists inside `openshift-virtualization/kustomization.yaml`'s `patches:` (`spec/pvc/storageClassName`), so it must already be correct there before the first sync. `DataVolume.spec.pvc.storageClassName` is immutable, so changing it later means deleting the `DataVolume` (and the `VirtualMachine` using it) before ArgoCD can self-heal it back with a new value.
+
+> **Note:** Sync succeeding doesn't mean you'll see the `Application` in the ArgoCD **UI** — that's a separate RBAC system from the Kubernetes permissions `rbac.yaml` grants. See [Troubleshooting](#gitops-application-doesnt-appear-in-the-argocd-ui) if the UI looks empty.
 
 ## Environment Variables
 
@@ -153,6 +166,8 @@ oc apply -k gitops/
 | `IMAGE_NAME` | Image name | `bootc-webserver` |
 | `IMAGE_TAG` | Image tag | `20260827-1505` |
 | `STORAGE_CLASS` | OCP storage class | `ocs-storagecluster-ceph-rbd` |
+
+![OpenShift GitOps](../static/gitops1.png)
 
 ## Troubleshooting
 
@@ -186,6 +201,7 @@ Everything found and fixed while building the **OpenShift Pipelines** flow, in t
     - [deploy-vm: `Fatal glibc error: CPU does not support x86-64-v3`](#deploy-vm-fatal-glibc-error-cpu-does-not-support-x86-64-v3)
     - [deploy-vm: `Cannot update DataVolume Spec`](#deploy-vm-cannot-update-datavolume-spec)
     - [deploy-vm: live migration fails with "PVC is not shared"](#deploy-vm-live-migration-fails-with-pvc-is-not-shared)
+    - [GitOps: application doesn't appear in the ArgoCD UI](#gitops-application-doesnt-appear-in-the-argocd-ui)
 
 ### OpenShift Pipelines operator not installed
 
@@ -378,3 +394,42 @@ rpc error: code = InvalidArgument desc = non-block volume with RWX access mode i
 `pipeline.yaml`'s `deploy-vm` `DataVolume` now requests `accessModes: [ReadWriteMany]`, `volumeMode: Block`, and an explicit `storageClassName` (its block storage class, rather than relying on whatever is annotated default). CDI imports the QCOW2 straight onto the block device instead of writing a `disk.img` file — no VM-side change needed, KubeVirt attaches a Block PVC as a virtio disk exactly like a Filesystem one. Confirmed fixed: `virtctl migrate` now reports the VMI as `LIVE-MIGRATABLE: True` and completes the migration to a different node.
 
 If your cluster's storage only offers `ReadWriteMany` on a file-based (e.g. CephFS) class instead of block, use that class with `volumeMode: Filesystem` and drop `volumeMode: Block` — check with a throwaway PVC first, since the two failure modes above look similar but need opposite fixes.
+
+### GitOps: application doesn't appear in the ArgoCD UI
+
+`oc get application.argoproj.io -n openshift-gitops` shows `bootc-webserver`, it's synced and `Healthy`, the VM is running — but logging into the ArgoCD web UI shows no applications at all.
+
+This is a different permission system than the one `gitops/rbac.yaml` fixes. `rbac.yaml` grants the `openshift-gitops-argocd-application-controller`/`-server` **ServiceAccounts** Kubernetes RBAC to create `VirtualMachine`/`DataVolume`/`Route` objects — that's what lets the sync itself succeed, and it has nothing to do with what a logged-in *user* can see. The ArgoCD UI has its own internal RBAC (Casbin-based), configured separately via the `ArgoCD` custom resource's `.spec.rbac` (which the operator renders into the `argocd-rbac-cm` ConfigMap in `openshift-gitops`):
+
+```bash
+oc get argocd openshift-gitops -n openshift-gitops -o jsonpath='{.spec.rbac}'
+```
+
+A typical default only grants the built-in `role:admin` to the **groups** `system:cluster-admins` and `cluster-admins`, with `defaultPolicy: ""` (deny everything else). The catch: `system:cluster-admins` is a virtual Kubernetes group that generally only applies to `system:admin`-style certificate users, not to a regular user who happens to have `cluster-admin` bound directly to their `User` object. Check which kind of binding you actually have and whether you belong to any OpenShift `Group` at all:
+
+```bash
+oc get clusterrolebindings -o json | jq -r '.items[] | select(.subjects[]?.name=="<your-username>") | .metadata.name'
+oc get groups -o json | jq -r '.items[] | select(.users[]? =="<your-username>") | .metadata.name'
+```
+
+If the binding is a direct `User` subject and you're in no groups (common on lab/dev clusters), there's nothing for the default policy to match, so it falls through to `defaultPolicy: ""` — access denied, and the UI just renders as if there were zero applications. Add yourself to the policy directly — `g, <subject>, <role>` works with a plain identifier exactly like it works with a group name:
+
+```bash
+oc patch argocd openshift-gitops -n openshift-gitops --type=merge -p '{"spec":{"rbac":{"policy":"g, system:cluster-admins, role:admin\ng, cluster-admins, role:admin\ng, <your-username>, role:admin\n"}}}'
+```
+
+**This alone may not be enough.** The `<subject>` in a `g,` line has to match a value that's actually present in your login token, and with OpenShift GitOps' built-in Dex `openshift` connector, that's *not* guaranteed to be your username. Check what ArgoCD actually sees per request in the server log (`grpc.request.claims`):
+
+```bash
+oc logs -n openshift-gitops deploy/openshift-gitops-server | grep -o '"sub":"[^"]*"' | tail -1
+```
+
+If `sub` is a long opaque string (Dex encodes the OpenShift user UID there, not the username) rather than your plain username, a `g, <your-username>, role:admin` line never matches, since by default ArgoCD only checks the `sub` claim plus whatever claims are listed in `scopes` (default `[groups]`) — and this connector emits no `groups` claim either. The username **is** present, just under `email`/`preferred_username` instead. Add that claim to `scopes` so ArgoCD checks it too:
+
+```bash
+oc patch argocd openshift-gitops -n openshift-gitops --type=merge -p '{"spec":{"rbac":{"scopes":"[groups, email]"}}}'
+```
+
+Now the `g, <your-username>, role:admin` line matches against the `email` claim's value. `argocd-server` watches `argocd-rbac-cm` and reloads both `policy` and `scopes` live — no restart or redeploy needed, just refresh the UI (no need to log out; the already-issued token already carries the `email` claim, only the server-side check changed).
+
+Both of these are cluster-wide ArgoCD instance settings shared by every `Application` on the cluster, not something specific to this project, so they're deliberately left out of `gitops/rbac.yaml`/`kustomization.yaml` — apply them by hand per cluster instead of baking a username into a manifest that others might reuse.

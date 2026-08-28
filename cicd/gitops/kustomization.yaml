@@ -5,6 +5,7 @@ kind: Kustomization
 namespace: openshift-gitops
 
 resources:
+  - rbac.yaml
   - application.yaml
   # Uncomment for automatic image updates
   # - image-updater.yaml

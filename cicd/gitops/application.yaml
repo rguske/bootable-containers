@@ -25,10 +25,20 @@ spec:
       # Override image tag dynamically
       images:
         - quay.io/rguske/bootc-webserver=quay.io/rguske/bootc-webserver:20260827-1505-disk
+      # openshift-virtualization/kustomization.yaml hardcodes
+      # `namespace: bootable-containers-demo` (used by the manual "Demo 3"
+      # deployment in the top-level README). Without this override, that
+      # value silently wins over destination.namespace below, so GitOps
+      # would deploy into the same namespace as the manual demo instead of
+      # its own bootable-containers-gitops (confirmed while testing this
+      # override mechanism against a multi-env ApplicationSet). Setting
+      # kustomize.namespace runs `kustomize edit set namespace` before
+      # build, which overrides the base's namespace transform.
+      namespace: bootable-containers-gitops
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: bootable-containers-demo
+    namespace: bootable-containers-gitops
 
   syncPolicy:
     automated:
@@ -53,50 +63,3 @@ spec:
       jsonPointers:
         - /spec/template/spec/domain/resources
         - /status
----
-# ApplicationSet for multi-environment deployment
-apiVersion: argoproj.io/v1alpha1
-kind: ApplicationSet
-metadata:
-  name: bootc-webserver-envs
-  namespace: openshift-gitops
-spec:
-  generators:
-    - list:
-        elements:
-          - env: dev
-            namespace: bootable-containers-dev
-            imageTag: develop
-          - env: staging
-            namespace: bootable-containers-staging
-            imageTag: 20260827-1505
-          - env: prod
-            namespace: bootable-containers-prod
-            imageTag: stable
-  
-  template:
-    metadata:
-      name: 'bootc-webserver-{{env}}'
-      namespace: openshift-gitops
-      labels:
-        app.kubernetes.io/name: bootc-webserver
-        environment: '{{env}}'
-    spec:
-      project: default
-      source:
-        repoURL: https://github.com/rguske/bootable-containers.git
-        targetRevision: main
-        path: openshift-virtualization
-        kustomize:
-          images:
-            - 'quay.io/rguske/bootc-webserver=quay.io/rguske/bootc-webserver:{{imageTag}}-disk'
-          namePrefix: '{{env}}-'
-      destination:
-        server: https://kubernetes.default.svc
-        namespace: '{{namespace}}'
-      syncPolicy:
-        automated:
-          prune: true
-          selfHeal: true
-        syncOptions:
-          - CreateNamespace=true
