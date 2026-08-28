@@ -30,7 +30,7 @@ metadata:
   annotations:
     # ArgoCD Image Updater annotations
     argocd-image-updater.argoproj.io/image-list: |
-      disk=quay.io/YOUR_USERNAME/bootc-webserver
+      disk=quay.io/rguske/bootc-webserver
     argocd-image-updater.argoproj.io/disk.update-strategy: name
     argocd-image-updater.argoproj.io/disk.allow-tags: regexp:^[0-9]{8}-[0-9]{4}-disk$
     argocd-image-updater.argoproj.io/write-back-method: git
@@ -38,7 +38,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/YOUR_ORG/bootable-containers.git
+    repoURL: https://github.com/rguske/bootable-containers.git
     targetRevision: main
     path: openshift-virtualization
   destination:

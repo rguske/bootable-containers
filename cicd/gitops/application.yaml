@@ -16,7 +16,7 @@ spec:
   project: default
   
   source:
-    repoURL: https://github.com/YOUR_ORG/bootable-containers.git
+    repoURL: https://github.com/rguske/bootable-containers.git
     targetRevision: main
     path: openshift-virtualization
     
@@ -24,7 +24,7 @@ spec:
     kustomize:
       # Override image tag dynamically
       images:
-        - quay.io/YOUR_USERNAME/bootc-webserver=quay.io/YOUR_USERNAME/bootc-webserver:20260827-1505-disk
+        - quay.io/rguske/bootc-webserver=quay.io/rguske/bootc-webserver:20260827-1505-disk
 
   destination:
     server: https://kubernetes.default.svc
@@ -84,12 +84,12 @@ spec:
     spec:
       project: default
       source:
-        repoURL: https://github.com/YOUR_ORG/bootable-containers.git
+        repoURL: https://github.com/rguske/bootable-containers.git
         targetRevision: main
         path: openshift-virtualization
         kustomize:
           images:
-            - 'quay.io/YOUR_USERNAME/bootc-webserver=quay.io/YOUR_USERNAME/bootc-webserver:{{imageTag}}-disk'
+            - 'quay.io/rguske/bootc-webserver=quay.io/rguske/bootc-webserver:{{imageTag}}-disk'
           namePrefix: '{{env}}-'
       destination:
         server: https://kubernetes.default.svc

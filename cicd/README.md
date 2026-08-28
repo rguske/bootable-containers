@@ -132,6 +132,11 @@ Pin the disk image to a UTC date-time tag (for example `20260827-1505-disk`), no
 
 Replace `YOUR_ORG` and `YOUR_USERNAME` in `gitops/application.yaml` (`repoURL`, image pin) and `gitops/image-updater.yaml` (`image-list`, `repoURL`).
 
+`IMAGE_TAG` and `STORAGE_CLASS` are **not** set the same way. `application.yaml`'s `source.path` points at `openshift-virtualization/` (not this `gitops/` directory), and ArgoCD runs `kustomize build` on it as-is:
+
+- `IMAGE_TAG` *is* overridable per `Application`, via `source.kustomize.images` in `application.yaml` — that's the `...bootc-webserver:20260827-1505-disk` line.
+- `STORAGE_CLASS` has no such override. It only exists inside `openshift-virtualization/kustomization.yaml`'s `patches:` (`spec/pvc/storageClassName`), so it must already be correct there before the first sync. `DataVolume.spec.pvc.storageClassName` is immutable, so changing it later means deleting the `DataVolume` (and the `VirtualMachine` using it) before ArgoCD can self-heal it back with a new value.
+
 ```bash
 oc apply -f gitops/application.yaml
 ```

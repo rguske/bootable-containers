@@ -4,6 +4,8 @@ A learning guide for understanding, building, and deploying Bootable Containers 
 
 > **Note**: This project uses **CentOS Stream 9** bootc images for simplicity (no subscription required). The concepts apply equally to RHEL bootc images.
 
+> **CI/CD**: For building, converting, and deploying these images automatically via GitHub Actions, OpenShift Pipelines, or GitOps, see the [CI/CD README](cicd/README.md).
+
 ## Table of Contents
 
 - [Concepts](#concepts)
@@ -391,9 +393,10 @@ cd ../..
 oc get sc
 export STORAGE_CLASS=<your-storage-class>
 
-# Update kustomization.yaml with your values
-sed -i "" "s|YOUR_USERNAME|${USERNAME}|g" openshift-virtualization/kustomization.yaml
-sed -i "" "s|YOUR_STORAGE_CLASS|${STORAGE_CLASS}|g" openshift-virtualization/kustomization.yaml
+# Update kustomization.yaml with your values (it ships with rguske /
+# kubevirt-odf-replica-two-block as placeholders, see the patches: comment)
+sed -i "" "s|rguske|${USERNAME}|g" openshift-virtualization/kustomization.yaml
+sed -i "" "s|kubevirt-odf-replica-two-block|${STORAGE_CLASS}|g" openshift-virtualization/kustomization.yaml
 
 # Deploy using kustomize
 oc apply -k openshift-virtualization/
