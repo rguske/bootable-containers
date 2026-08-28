@@ -49,11 +49,6 @@ spec:
     - name: disk-image-path
       description: Path to the generated disk image
 
-  stepTemplate:
-    env:
-      - name: DOCKER_CONFIG
-        value: $(workspaces.dockerconfig.path)
-
   steps:
     - name: create-output-dir
       image: registry.access.redhat.com/ubi9/ubi-minimal:latest
@@ -70,9 +65,24 @@ spec:
       script: |
         #!/bin/bash
         set -e
-        
+
+        if [ "$(workspaces.dockerconfig.bound)" = "true" ]; then
+          mkdir -p /root/.docker
+          if [ -f "$(workspaces.dockerconfig.path)/.dockerconfigjson" ]; then
+            cp "$(workspaces.dockerconfig.path)/.dockerconfigjson" /root/.docker/config.json
+          elif [ -f "$(workspaces.dockerconfig.path)/config.json" ]; then
+            cp "$(workspaces.dockerconfig.path)/config.json" /root/.docker/config.json
+          fi
+        fi
+
+        # bootc-image-builder no longer pulls the source image itself; it only
+        # inspects images already present in the container storage mounted at
+        # /var/lib/containers/storage.
+        echo "Pulling $(params.source-image)..."
+        podman pull "$(params.source-image)"
+
         echo "Converting $(params.source-image) to $(params.output-type)..."
-        
+
         # Run bootc-image-builder
         /usr/bin/bootc-image-builder \
           --type $(params.output-type) \
@@ -87,6 +97,8 @@ spec:
       volumeMounts:
         - name: containers-storage
           mountPath: /var/lib/containers/storage
+        - name: store
+          mountPath: /store
 
     - name: write-result
       image: registry.access.redhat.com/ubi9/ubi-minimal:latest
@@ -103,4 +115,15 @@ spec:
 
   volumes:
     - name: containers-storage
+      emptyDir: {}
+    # bootc-image-builder's internal osbuild store (VOLUME /store in its
+    # image) must be a real mounted filesystem. Left unmounted, /store is
+    # just a directory on the step's container root, which CRI-O mounts
+    # with a single static SELinux context (overlay "context=..." option).
+    # A static-context mount cannot be relabeled per file, so the
+    # setfiles/chcon calls bootc-image-builder runs against /store fail
+    # with "Operation not supported" no matter what SELinux type or
+    # privilege level the step has. A normal emptyDir is backed by a real
+    # per-file-labeled filesystem (seclabel), so relabeling works.
+    - name: store
       emptyDir: {}

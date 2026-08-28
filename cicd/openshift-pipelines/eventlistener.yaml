@@ -68,7 +68,7 @@ spec:
           - name: registry-url
             value: quay.io
           - name: registry-namespace
-            value: YOUR_USERNAME
+            value: rguske
         workspaces:
           - name: source
             volumeClaimTemplate:
@@ -81,6 +81,14 @@ spec:
           - name: dockerconfig
             secret:
               secretName: registry-credentials
+        taskRunTemplate:
+          serviceAccountName: pipeline
+          # Without this, git-clone (running as UID 65532) can't write to
+          # the freshly provisioned PVC, whose lost+found dir is owned by
+          # root: "rm: cannot remove '.../lost+found': Permission denied".
+          podTemplate:
+            securityContext:
+              fsGroup: 65532
 ---
 # TriggerBinding - extracts values from webhook payload
 apiVersion: triggers.tekton.dev/v1beta1

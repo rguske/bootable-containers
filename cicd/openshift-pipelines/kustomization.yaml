@@ -1,0 +1,12 @@
+# PipelineRun is not listed here: it uses generateName and must be created with
+# `oc create -f pipelinerun.yaml`, not apply.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - tasks/bootc-image-builder-task.yaml
+  - tasks/buildah-bootc-task.yaml
+  - tasks/oc-client-task.yaml
+  - pipeline.yaml
+  - eventlistener.yaml

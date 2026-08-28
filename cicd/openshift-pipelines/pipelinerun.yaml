@@ -1,6 +1,9 @@
 ---
 # Example PipelineRun for bootc-build-deploy pipeline
-# Customize the parameters for your environment
+# Use `oc create`, not `oc apply`: generateName is not valid with apply.
+# Replace YOUR_ORG and YOUR_USERNAME before creating the run.
+# YOUR_ORG is a placeholder, not a cluster variable. Leave it as-is and
+# git-clone fails: fatal: could not read Username for 'https://github.com'
 
 apiVersion: tekton.dev/v1
 kind: PipelineRun
@@ -15,7 +18,7 @@ spec:
   
   params:
     - name: git-url
-      value: "https://github.com/YOUR_ORG/bootable-containers.git"
+      value: "https://github.com/rguske/bootable-containers.git"
     - name: git-revision
       value: "main"
     - name: image-name
@@ -25,7 +28,7 @@ spec:
     - name: registry-url
       value: "quay.io"
     - name: registry-namespace
-      value: "YOUR_USERNAME"
+      value: "rguske"
     - name: target-namespace
       value: "bootable-containers-demo"
   
@@ -48,24 +51,3 @@ spec:
     podTemplate:
       securityContext:
         fsGroup: 65532
----
-# Secret for registry credentials
-# Create with: oc create secret docker-registry registry-credentials ...
-apiVersion: v1
-kind: Secret
-metadata:
-  name: registry-credentials
-  namespace: bootable-containers-cicd
-type: kubernetes.io/dockerconfigjson
-stringData:
-  .dockerconfigjson: |
-    {
-      "auths": {
-        "quay.io": {
-          "auth": "BASE64_ENCODED_USERNAME:PASSWORD"
-        },
-        "registry.redhat.io": {
-          "auth": "BASE64_ENCODED_USERNAME:PASSWORD"
-        }
-      }
-    }

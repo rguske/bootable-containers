@@ -1,0 +1,97 @@
+# Privileged Buildah task for bootc images.
+# The cluster `buildah` task only adds SETFCAP and is not enough for centos-bootc.
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: buildah-bootc
+  namespace: bootable-containers-cicd
+  labels:
+    app.kubernetes.io/name: bootc-pipeline
+spec:
+  description: |
+    Build and push a bootc Containerfile. Runs privileged with extra memory
+    and ephemeral storage. The cluster buildah task is not used here.
+
+  params:
+    - name: IMAGE
+      type: string
+      description: Fully qualified image name to build and push
+    - name: DOCKERFILE
+      type: string
+      description: Path to the Containerfile, relative to the source workspace
+    - name: CONTEXT
+      type: string
+      description: Build context path, relative to the source workspace
+      default: "."
+
+  workspaces:
+    - name: source
+      description: Git checkout containing the Containerfile
+    - name: dockerconfig
+      description: dockerconfigjson secret for registry auth
+      optional: true
+
+  results:
+    - name: IMAGE_URL
+      description: Image that was pushed
+    - name: IMAGE_DIGEST
+      description: Digest after push
+
+  steps:
+    - name: build
+      image: registry.redhat.io/rhel9/buildah:latest
+      workingDir: $(workspaces.source.path)
+      securityContext:
+        privileged: true
+      computeResources:
+        requests:
+          memory: 4Gi
+          ephemeral-storage: 8Gi
+        limits:
+          memory: 8Gi
+          # overlay is copy-on-write and only needs space for changed files
+          # per layer. It requires a real kernel overlayfs mount, which is
+          # only available because this step runs privileged: true.
+          ephemeral-storage: 40Gi
+      env:
+        - name: STORAGE_DRIVER
+          value: overlay
+      script: |
+        #!/bin/bash
+        set -eu
+        set -o pipefail
+
+        if [ "$(workspaces.dockerconfig.bound)" = "true" ]; then
+          mkdir -p /root/.docker
+          if [ -f "$(workspaces.dockerconfig.path)/.dockerconfigjson" ]; then
+            cp "$(workspaces.dockerconfig.path)/.dockerconfigjson" /root/.docker/config.json
+          elif [ -f "$(workspaces.dockerconfig.path)/config.json" ]; then
+            cp "$(workspaces.dockerconfig.path)/config.json" /root/.docker/config.json
+          else
+            echo "dockerconfig workspace is bound but no config.json or .dockerconfigjson was found"
+            exit 1
+          fi
+        fi
+
+        echo "Building $(params.IMAGE) from $(params.DOCKERFILE) (context $(params.CONTEXT))"
+        buildah bud \
+          --storage-driver="${STORAGE_DRIVER}" \
+          --tls-verify=true \
+          --isolation=chroot \
+          --file "$(params.DOCKERFILE)" \
+          --tag "$(params.IMAGE)" \
+          "$(params.CONTEXT)"
+
+        echo "Pushing $(params.IMAGE)"
+        digest_file="$(mktemp)"
+        buildah push \
+          --storage-driver="${STORAGE_DRIVER}" \
+          --tls-verify=true \
+          --digestfile="${digest_file}" \
+          "$(params.IMAGE)" \
+          "docker://$(params.IMAGE)"
+
+        printf '%s' "$(params.IMAGE)" > "$(results.IMAGE_URL.path)"
+        printf '%s' "$(cat "${digest_file}")" > "$(results.IMAGE_DIGEST.path)"
+        echo "Pushed $(params.IMAGE) ($(cat "${digest_file}"))"

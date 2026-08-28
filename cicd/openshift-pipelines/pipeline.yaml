@@ -1,6 +1,9 @@
 ---
 # OpenShift Pipelines (Tekton) for Bootable Containers
-# Requires: OpenShift Pipelines Operator installed
+# Requires: OpenShift Pipelines Operator installed.
+# Standard tasks (git-clone, buildah, openshift-client) are referenced with
+# the cluster resolver from the openshift-pipelines namespace. ClusterTask
+# is not valid on current operator versions.
 
 apiVersion: tekton.dev/v1
 kind: Pipeline
@@ -17,7 +20,7 @@ spec:
     - name: git-url
       type: string
       description: Git repository URL
-      default: "https://github.com/YOUR_ORG/bootable-containers.git"
+      default: "https://github.com/rguske/bootable-containers.git"
     
     - name: git-revision
       type: string
@@ -96,22 +99,30 @@ spec:
     # Task 2: Clone the repository
     - name: git-clone
       taskRef:
-        name: git-clone
-        kind: ClusterTask
+        resolver: cluster
+        params:
+          - name: kind
+            value: task
+          - name: name
+            value: git-clone
+          - name: namespace
+            value: openshift-pipelines
       params:
-        - name: url
+        - name: URL
           value: $(params.git-url)
-        - name: revision
+        - name: REVISION
           value: $(params.git-revision)
+        - name: DELETE_EXISTING
+          value: "false"
       workspaces:
         - name: output
           workspace: source
 
-    # Task 3: Build the bootc container image
+    # Task 3: Build the bootc container image (privileged; cluster buildah is not enough)
     - name: build-bootc-image
       taskRef:
-        name: buildah
-        kind: ClusterTask
+        name: buildah-bootc
+        kind: Task
       runAfter:
         - git-clone
         - set-image-tag
@@ -122,8 +133,6 @@ spec:
           value: $(params.containerfile-path)
         - name: CONTEXT
           value: $(params.context-path)
-        - name: TLSVERIFY
-          value: "true"
       workspaces:
         - name: source
           workspace: source
@@ -151,8 +160,14 @@ spec:
     # Task 5: Package QCOW2 for OCP-V
     - name: package-disk-image
       taskRef:
-        name: buildah
-        kind: ClusterTask
+        resolver: cluster
+        params:
+          - name: kind
+            value: task
+          - name: name
+            value: buildah
+          - name: namespace
+            value: openshift-pipelines
       runAfter:
         - convert-to-qcow2
       params:
@@ -160,8 +175,13 @@ spec:
           value: "$(params.registry-url)/$(params.registry-namespace)/$(params.image-name):$(tasks.set-image-tag.results.tag)-disk"
         - name: DOCKERFILE
           value: "demos/webserver/Containerfile.ocpv"
+        # Context must be the workspace root, not demos/webserver: the
+        # bootc-image-builder task writes its output to
+        # $(workspaces.source.path)/output/qcow2/disk.qcow2, and this
+        # Containerfile's ADD path ("output/qcow2/disk.qcow2") is resolved
+        # relative to the build context.
         - name: CONTEXT
-          value: "demos/webserver"
+          value: "."
       workspaces:
         - name: source
           workspace: source
@@ -171,8 +191,8 @@ spec:
     # Task 6: Deploy to OpenShift Virtualization
     - name: deploy-vm
       taskRef:
-        name: openshift-client
-        kind: ClusterTask
+        name: oc-client
+        kind: Task
       runAfter:
         - package-disk-image
       params:
@@ -183,6 +203,14 @@ spec:
             
             # Create namespace if not exists
             oc create namespace $(params.target-namespace) --dry-run=client -o yaml | oc apply -f -
+            
+            # DataVolume specs are immutable once created (CDI's admission
+            # webhook rejects "Cannot update DataVolume Spec"), and every
+            # run has a new image tag, so replace it instead of applying in
+            # place. Its PVC stays in use as long as the VM is running, so
+            # stop the VM first or PVC/DataVolume deletion hangs.
+            oc delete vm $(params.image-name) -n $(params.target-namespace) --ignore-not-found --wait=true --timeout=120s
+            oc delete datavolume $(params.image-name)-disk -n $(params.target-namespace) --ignore-not-found --wait=true --timeout=120s
             
             # Apply DataVolume
             cat <<EOF | oc apply -f -
@@ -196,8 +224,17 @@ spec:
                 registry:
                   url: "${IMAGE_URL}"
               pvc:
+                # ReadWriteOnce + Filesystem binds fine but blocks live migration
+                # ("PVC is not shared, live migration requires ReadWriteMany").
+                # This cluster's block storage class only allows ReadWriteMany
+                # when volumeMode is Block (confirmed: RWX+Filesystem is
+                # rejected with "non-block volume with RWX access mode is not
+                # supported"), so CDI must import straight onto a block device
+                # instead of writing a disk.img file.
                 accessModes:
-                  - ReadWriteOnce
+                  - ReadWriteMany
+                volumeMode: Block
+                storageClassName: kubevirt-odf-replica-two-block
                 resources:
                   requests:
                     storage: 20Gi
@@ -210,5 +247,5 @@ spec:
             
             echo "Deployment initiated. Check VM status with: oc get vm -n $(params.target-namespace)"
       workspaces:
-        - name: manifest-dir
+        - name: manifest_dir
           workspace: source

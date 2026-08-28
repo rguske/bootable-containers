@@ -1,0 +1,49 @@
+---
+# Custom oc-client Task.
+# The cluster `openshift-client` task hardcodes its image as
+# image-registry.openshift-image-registry.svc:5000/openshift/cli:latest,
+# which only exists when the cluster's internal image registry is deployed.
+# On clusters where it's Removed (Config.imageregistry.operator.openshift.io
+# managementState), that image can't be pulled: "no such host" resolving
+# the internal registry's Service DNS name. This task uses a public image
+# so it works regardless of internal registry state.
+
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: oc-client
+  namespace: bootable-containers-cicd
+  labels:
+    app.kubernetes.io/name: bootc-pipeline
+spec:
+  description: |
+    Run oc CLI commands against the cluster, using a publicly pullable
+    image instead of the in-cluster image registry's cli imagestream.
+
+  params:
+    - name: SCRIPT
+      type: string
+      description: The OpenShift CLI script to run
+      default: "oc help"
+
+  workspaces:
+    - name: manifest_dir
+      description: Workspace containing manifests to apply, mounted as the working directory
+      optional: true
+
+  steps:
+    - name: oc
+      # quay.io/openshift/origin-cli fails here with "Fatal glibc error: CPU
+      # does not support x86-64-v3" (its RHEL9-based glibc requires a newer
+      # microarchitecture baseline than this cluster's nodes expose, common
+      # when the cluster itself runs virtualized with a conservative CPU
+      # model). bitnami/kubectl has no such requirement. `oc` isn't used for
+      # anything OpenShift-CLI-specific here (just create/apply on plain and
+      # custom resources), so kubectl is a drop-in replacement.
+      image: docker.io/bitnami/kubectl:latest
+      workingDir: $(workspaces.manifest_dir.path)
+      script: |
+        #!/bin/bash
+        set -e
+        oc() { kubectl "$@"; }
+        $(params.SCRIPT)
