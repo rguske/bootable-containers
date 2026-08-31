@@ -414,8 +414,14 @@ Once deployed, access the web server via the route URL:
 
 ### VM Credentials
 
-- **User**: `rhel`
-- **Password**: `R3dH4t1!`
+The VM has two users configured:
+
+| User | Password | Configured via |
+|------|----------|----------------|
+| `bootc-user` | `redhat` | Containerfile (always available) |
+| `rhel` | `R3dH4t1!` | cloud-init (requires cloud-init in image) |
+
+> **Note**: The `rhel` user is created by cloud-init at first boot. If cloud-init isn't installed in your bootc image, use `bootc-user` instead.
 
 > **Note**: The default VM uses 1 CPU core and 2Gi memory. Adjust `virtualmachine.yaml` if your cluster has different capacity or if you need more resources.
 

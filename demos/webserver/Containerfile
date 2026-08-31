@@ -8,10 +8,14 @@
 FROM quay.io/centos-bootc/centos-bootc:stream9
 
 # Update system and install required packages
+# cloud-init is required for VM cloud-init configuration to work
 RUN dnf -y update && \
-    dnf -y install tmux httpd vim-minimal && \
+    dnf -y install tmux httpd vim-minimal cloud-init && \
     dnf clean all && \
     rm -rf /var/cache/dnf
+
+# Enable cloud-init services
+RUN systemctl enable cloud-init cloud-init-local cloud-config cloud-final
 
 # Create a user with password (password: redhat)
 RUN useradd -m -G wheel bootc-user && \
