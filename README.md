@@ -15,6 +15,7 @@ A learning guide for understanding, building, and deploying Bootable Containers 
 - [Demo 1: Build a Web Server](#demo-1-build-a-web-server)
 - [Demo 2: Regular Container vs Bootable Container](#demo-2-regular-container-vs-bootable-container)
 - [Demo 3: Deploy to OpenShift Virtualization](#demo-3-deploy-to-openshift-virtualization)
+- [Demo 4: Upgrade and Rollback](#demo-4-upgrade-and-rollback)
 - [CI/CD Integration](#cicd-integration)
 - [Updates and Rollbacks](#updates-and-rollbacks)
 - [Best Practices](#best-practices)
@@ -424,6 +425,93 @@ The VM has two users configured:
 > **Note**: The `rhel` user is created by cloud-init at first boot. If cloud-init isn't installed in your bootc image, use `bootc-user` instead.
 
 > **Note**: The default VM uses 1 CPU core and 2Gi memory. Adjust `virtualmachine.yaml` if your cluster has different capacity or if you need more resources.
+
+---
+
+## Demo 4: Upgrade and Rollback
+
+Demonstrate bootc's atomic upgrade and rollback capabilities by switching between image versions.
+
+### Prerequisites
+
+- VM running v1.0 from Demo 3
+- Both v1.0 and v1.1 images pushed to your registry
+
+### Step 1: Build Both Versions
+
+**v1.0 (red theme, default):**
+```bash
+cd demos/webserver
+
+podman build --platform linux/amd64 \
+  -t quay.io/${USERNAME}/bootc-webserver:v1.0 .
+
+podman push quay.io/${USERNAME}/bootc-webserver:v1.0
+```
+
+**v1.1 (purple theme):**
+```bash
+podman build --platform linux/amd64 \
+  --build-arg THEME_COLOR="#7b2cbf" \
+  --build-arg THEME_COLOR_DARK="#5a189a" \
+  --build-arg THEME_COLOR_LIGHT="#9d4edd" \
+  --build-arg VERSION="1.1" \
+  --build-arg SUBTITLE="Version 1.1 - Purple Edition" \
+  -t quay.io/${USERNAME}/bootc-webserver:v1.1 .
+
+podman push quay.io/${USERNAME}/bootc-webserver:v1.1
+```
+
+### Step 2: Verify Current Version
+
+Open the web server URL and confirm you see the **red theme** with **v1.0** badge.
+
+SSH into the VM:
+```bash
+virtctl ssh bootc-user@bootc-webserver -n bootable-containers-demo
+```
+
+Check current bootc status:
+```bash
+sudo bootc status
+```
+
+### Step 3: Upgrade to v1.1
+
+```bash
+sudo bootc switch quay.io/${USERNAME}/bootc-webserver:v1.1
+```
+
+Reboot to apply:
+```bash
+sudo systemctl reboot
+```
+
+After reboot, refresh the browser. You should see:
+- **Purple theme**
+- **v1.1** badge
+- Subtitle: "Version 1.1 - Purple Edition"
+
+### Step 4: Rollback to v1.0
+
+SSH back into the VM:
+```bash
+virtctl ssh bootc-user@bootc-webserver -n bootable-containers-demo
+```
+
+Rollback:
+```bash
+sudo bootc rollback
+sudo systemctl reboot
+```
+
+After reboot, refresh the browser. You should see the **red theme** and **v1.0** badge restored.
+
+### Key Takeaways
+
+- **Atomic updates**: The entire OS updates as one unit
+- **Instant rollback**: Previous version is preserved and ready to boot
+- **No package drift**: Every boot is from a known, tested image
 
 ---
 
