@@ -186,11 +186,12 @@ Build a simple Apache httpd web server as a bootable container.
 ```bash
 cd demos/webserver
 
-# Build the image
-podman build -t quay.io/${USERNAME}/bootc-webserver:v1.0 .
+# Build multi-arch image (amd64 + arm64)
+podman build --platform linux/amd64,linux/arm64 \
+  --manifest quay.io/${USERNAME}/bootc-webserver:v1.0 .
 
-# Push to registry
-podman push quay.io/${USERNAME}/bootc-webserver:v1.0
+# Push the manifest
+podman manifest push quay.io/${USERNAME}/bootc-webserver:v1.0
 ```
 
 ### Test Locally (Quick Check)
