@@ -43,15 +43,16 @@ echo "================================================"
 
 cd "$DEMO_DIR"
 
-# Build the image
+# Build multi-arch image (amd64 + arm64)
 echo ""
-echo "[1/2] Building image..."
-podman build -t "${FULL_IMAGE}" .
+echo "[1/2] Building multi-arch image..."
+podman build --platform linux/amd64,linux/arm64 \
+    --manifest "${FULL_IMAGE}" .
 
-# Push the image
+# Push the manifest
 echo ""
-echo "[2/2] Pushing image..."
-podman push "${FULL_IMAGE}"
+echo "[2/2] Pushing manifest..."
+podman manifest push "${FULL_IMAGE}"
 
 echo ""
 echo "================================================"

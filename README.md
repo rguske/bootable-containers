@@ -262,16 +262,15 @@ Build the bootc container image and push to your registry. This works on any pla
 ```bash
 cd demos/webserver
 
-# On macOS with Apple Silicon, build for x86_64 architecture
-podman build --platform linux/amd64 \
-  -t quay.io/${USERNAME}/bootc-webserver:v1.0 .
+# Build multi-arch image (amd64 + arm64)
+podman build --platform linux/amd64,linux/arm64 \
+  --manifest quay.io/${USERNAME}/bootc-webserver:v1.0 .
 
-# On Linux x86_64, no --platform flag needed
-# podman build -t quay.io/${USERNAME}/bootc-webserver:v1.0 .
-
-# Push to registry
-podman push quay.io/${USERNAME}/bootc-webserver:v1.0
+# Push the manifest (includes both architectures)
+podman manifest push quay.io/${USERNAME}/bootc-webserver:v1.0
 ```
+
+> **Note**: Multi-arch builds create a manifest list that works on both x86_64 and ARM64 systems. On Apple Silicon, amd64 builds use emulation (slower but works).
 
 ### Step 2: Convert to QCOW2 (Linux x86_64 Required)
 
@@ -443,23 +442,25 @@ Demonstrate bootc's atomic upgrade and rollback capabilities by switching betwee
 ```bash
 cd demos/webserver
 
-podman build --platform linux/amd64 \
-  -t quay.io/${USERNAME}/bootc-webserver:v1.0 .
+# Build multi-arch image
+podman build --platform linux/amd64,linux/arm64 \
+  --manifest quay.io/${USERNAME}/bootc-webserver:v1.0 .
 
-podman push quay.io/${USERNAME}/bootc-webserver:v1.0
+podman manifest push quay.io/${USERNAME}/bootc-webserver:v1.0
 ```
 
 **v1.1 (purple theme):**
 ```bash
-podman build --platform linux/amd64 \
+# Build multi-arch image with theme customization
+podman build --platform linux/amd64,linux/arm64 \
   --build-arg THEME_COLOR="#7b2cbf" \
   --build-arg THEME_COLOR_DARK="#5a189a" \
   --build-arg THEME_COLOR_LIGHT="#9d4edd" \
   --build-arg VERSION="1.1" \
   --build-arg SUBTITLE="Version 1.1 - Purple Edition" \
-  -t quay.io/${USERNAME}/bootc-webserver:v1.1 .
+  --manifest quay.io/${USERNAME}/bootc-webserver:v1.1 .
 
-podman push quay.io/${USERNAME}/bootc-webserver:v1.1
+podman manifest push quay.io/${USERNAME}/bootc-webserver:v1.1
 ```
 
 ### Step 2: Verify Current Version
