@@ -43,16 +43,23 @@ echo "================================================"
 
 cd "$DEMO_DIR"
 
-# Build multi-arch image (amd64 + arm64)
+# Remove existing manifest if present
+podman manifest rm "${FULL_IMAGE}" 2>/dev/null || true
+
+# Create manifest and build multi-arch (amd64 + arm64)
 echo ""
-echo "[1/2] Building multi-arch image..."
+echo "[1/3] Creating manifest..."
+podman manifest create "${FULL_IMAGE}"
+
+echo ""
+echo "[2/3] Building multi-arch image..."
 podman build --platform linux/amd64,linux/arm64 \
     --manifest "${FULL_IMAGE}" .
 
 # Push the manifest
 echo ""
-echo "[2/2] Pushing manifest..."
-podman manifest push "${FULL_IMAGE}"
+echo "[3/3] Pushing manifest..."
+podman manifest push --all "${FULL_IMAGE}"
 
 echo ""
 echo "================================================"

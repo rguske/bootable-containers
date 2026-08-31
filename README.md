@@ -186,12 +186,16 @@ Build a simple Apache httpd web server as a bootable container.
 ```bash
 cd demos/webserver
 
-# Build multi-arch image (amd64 + arm64)
+# Remove existing image/manifest if present
+podman manifest rm quay.io/${USERNAME}/bootc-webserver:v1.0 2>/dev/null || true
+
+# Create manifest and build for both architectures
+podman manifest create quay.io/${USERNAME}/bootc-webserver:v1.0
 podman build --platform linux/amd64,linux/arm64 \
   --manifest quay.io/${USERNAME}/bootc-webserver:v1.0 .
 
 # Push the manifest
-podman manifest push quay.io/${USERNAME}/bootc-webserver:v1.0
+podman manifest push --all quay.io/${USERNAME}/bootc-webserver:v1.0
 ```
 
 ### Test Locally (Quick Check)
@@ -263,12 +267,16 @@ Build the bootc container image and push to your registry. This works on any pla
 ```bash
 cd demos/webserver
 
-# Build multi-arch image (amd64 + arm64)
+# Remove existing manifest if present
+podman manifest rm quay.io/${USERNAME}/bootc-webserver:v1.0 2>/dev/null || true
+
+# Create manifest and build for both architectures
+podman manifest create quay.io/${USERNAME}/bootc-webserver:v1.0
 podman build --platform linux/amd64,linux/arm64 \
   --manifest quay.io/${USERNAME}/bootc-webserver:v1.0 .
 
 # Push the manifest (includes both architectures)
-podman manifest push quay.io/${USERNAME}/bootc-webserver:v1.0
+podman manifest push --all quay.io/${USERNAME}/bootc-webserver:v1.0
 ```
 
 > **Note**: Multi-arch builds create a manifest list that works on both x86_64 and ARM64 systems. On Apple Silicon, amd64 builds use emulation (slower but works).
@@ -443,16 +451,24 @@ Demonstrate bootc's atomic upgrade and rollback capabilities by switching betwee
 ```bash
 cd demos/webserver
 
-# Build multi-arch image
+# Remove existing manifest if present
+podman manifest rm quay.io/${USERNAME}/bootc-webserver:v1.0 2>/dev/null || true
+
+# Create manifest and build multi-arch
+podman manifest create quay.io/${USERNAME}/bootc-webserver:v1.0
 podman build --platform linux/amd64,linux/arm64 \
   --manifest quay.io/${USERNAME}/bootc-webserver:v1.0 .
 
-podman manifest push quay.io/${USERNAME}/bootc-webserver:v1.0
+podman manifest push --all quay.io/${USERNAME}/bootc-webserver:v1.0
 ```
 
 **v1.1 (purple theme):**
 ```bash
-# Build multi-arch image with theme customization
+# Remove existing manifest if present
+podman manifest rm quay.io/${USERNAME}/bootc-webserver:v1.1 2>/dev/null || true
+
+# Create manifest and build multi-arch with theme customization
+podman manifest create quay.io/${USERNAME}/bootc-webserver:v1.1
 podman build --platform linux/amd64,linux/arm64 \
   --build-arg THEME_COLOR="#7b2cbf" \
   --build-arg THEME_COLOR_DARK="#5a189a" \
@@ -461,7 +477,7 @@ podman build --platform linux/amd64,linux/arm64 \
   --build-arg SUBTITLE="Version 1.1 - Purple Edition" \
   --manifest quay.io/${USERNAME}/bootc-webserver:v1.1 .
 
-podman manifest push quay.io/${USERNAME}/bootc-webserver:v1.1
+podman manifest push --all quay.io/${USERNAME}/bootc-webserver:v1.1
 ```
 
 ### Step 2: Verify Current Version
