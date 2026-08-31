@@ -8,9 +8,9 @@
     <link rel="stylesheet" href="https://unpkg.com/@patternfly/patternfly@6/patternfly.min.css">
     <style>
         :root {
-            --rh-red: #ee0000;
-            --rh-red-dark: #a30000;
-            --rh-red-light: #ff4d4d;
+            --rh-red: THEME_COLOR;
+            --rh-red-dark: THEME_COLOR_DARK;
+            --rh-red-light: THEME_COLOR_LIGHT;
         }
         
         body {
@@ -36,10 +36,23 @@
         }
         
         .demo-header {
+            position: relative;
             text-align: center;
             padding: var(--pf-t--global--spacer--xl) 0;
             background: linear-gradient(180deg, rgba(238, 0, 0, 0.1) 0%, transparent 100%);
             border-radius: var(--pf-t--global--border--radius--medium) var(--pf-t--global--border--radius--medium) 0 0;
+        }
+
+        .version-badge {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: var(--rh-red);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.9rem;
+            font-weight: 600;
         }
         
         .demo-emoji {
@@ -162,9 +175,10 @@
         <div class="pf-v6-l-bullseye__item demo-card">
             <div class="pf-v6-c-card">
                 <div class="demo-header">
+                    <span class="version-badge">vAPP_VERSION</span>
                     <div class="demo-emoji pulse">🚀</div>
                     <h1 class="demo-title"><span>Bootable</span> Container</h1>
-                    <p class="demo-subtitle">The Operating System as a Container Image</p>
+                    <p class="demo-subtitle">APP_SUBTITLE</p>
                 </div>
                 
                 <div class="pf-v6-c-card__body">
