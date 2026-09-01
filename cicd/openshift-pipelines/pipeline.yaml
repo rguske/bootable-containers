@@ -59,7 +59,7 @@ spec:
     - name: target-namespace
       type: string
       description: Namespace to deploy VM
-      default: "bootable-containers-demo"
+      default: "bootable-containers-cicd"
 
   workspaces:
     - name: source

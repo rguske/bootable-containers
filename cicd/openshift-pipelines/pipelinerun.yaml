@@ -15,7 +15,7 @@ metadata:
 spec:
   pipelineRef:
     name: bootc-build-deploy
-  
+
   params:
     - name: git-url
       value: "https://github.com/rguske/bootable-containers.git"
@@ -30,7 +30,7 @@ spec:
     - name: registry-namespace
       value: "rguske"
     - name: target-namespace
-      value: "bootable-containers-demo"
+      value: "bootable-containers-cicd"
   
   workspaces:
     - name: source
