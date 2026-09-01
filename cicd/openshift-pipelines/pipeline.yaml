@@ -97,26 +97,47 @@ spec:
               echo "Using image tag: ${TAG}"
 
     # Task 2: Clone the repository
+    # Using inline taskSpec instead of cluster git-clone to avoid git-init
+    # credential helper issues with public repos
     - name: git-clone
-      taskRef:
-        resolver: cluster
-        params:
-          - name: kind
-            value: task
-          - name: name
-            value: git-clone
-          - name: namespace
-            value: openshift-pipelines
       params:
-        - name: URL
+        - name: url
           value: $(params.git-url)
-        - name: REVISION
+        - name: revision
           value: $(params.git-revision)
-        - name: DELETE_EXISTING
-          value: "false"
       workspaces:
         - name: output
           workspace: source
+      taskSpec:
+        params:
+          - name: url
+            type: string
+          - name: revision
+            type: string
+            default: main
+        results:
+          - name: COMMIT
+            description: The commit SHA that was cloned
+        workspaces:
+          - name: output
+        steps:
+          - name: clone
+            image: alpine/git:latest
+            env:
+              - name: GIT_TERMINAL_PROMPT
+                value: "0"
+            script: |
+              #!/bin/sh
+              set -eu
+              CHECKOUT_DIR="$(workspaces.output.path)"
+              echo "Cleaning workspace ${CHECKOUT_DIR}..."
+              rm -rf "${CHECKOUT_DIR:?}"/* "${CHECKOUT_DIR}"/.[!.]* 2>/dev/null || true
+              cd "${CHECKOUT_DIR}"
+              echo "Cloning $(params.url) at $(params.revision)..."
+              git clone --depth 1 --branch "$(params.revision)" "$(params.url)" .
+              COMMIT=$(git rev-parse HEAD)
+              echo "Cloned commit: ${COMMIT}"
+              printf '%s' "${COMMIT}" > "$(results.COMMIT.path)"
 
     # Task 3: Build the bootc container image (privileged; cluster buildah is not enough)
     - name: build-bootc-image

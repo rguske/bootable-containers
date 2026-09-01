@@ -328,6 +328,25 @@ sudo podman run \
 # Result: output/qcow2/disk.qcow2
 ```
 
+Example terminal output:
+
+```code
+[rguske@centos-image-builder ~]$ sudo podman run \
+  --rm -it --privileged \
+  --pull=newer \
+  --security-opt label=type:unconfined_t \
+  -v "$PWD/output":/output \
+  -v /var/lib/containers/storage:/var/lib/containers/storage \
+  quay.io/centos-bootc/bootc-image-builder:latest \
+  --type qcow2 \
+  quay.io/${USERNAME}/bootc-webserver:v1.0
+[-] Disk image building step
+[5 / 5] Pipeline qcow2 [--------------------------------------------------------------------------------------------------------->] 100.00%
+[2 / 2] Stage org.osbuild.qemu [------------------------------------------------------------------------------------------------->] 100.00%
+Message: Results saved in .
+[rguske@centos-image-builder ~]$
+```
+
 **Options for Linux x86_64 environment:**
 
 
@@ -448,6 +467,7 @@ Demonstrate bootc's atomic upgrade and rollback capabilities by switching betwee
 ### Step 1: Build Both Versions
 
 **v1.0 (red theme, default):**
+
 ```bash
 cd demos/webserver
 
@@ -463,6 +483,7 @@ podman manifest push --all quay.io/${USERNAME}/bootc-webserver:v1.0
 ```
 
 **v1.1 (purple theme):**
+
 ```bash
 # Remove existing manifest if present
 podman manifest rm quay.io/${USERNAME}/bootc-webserver:v1.1 2>/dev/null || true
@@ -484,40 +505,73 @@ podman manifest push --all quay.io/${USERNAME}/bootc-webserver:v1.1
 
 Open the web server URL and confirm you see the **red theme** with **v1.0** badge.
 
-SSH into the VM:
+Connect to the VM:
+
 ```bash
-virtctl ssh bootc-user@bootc-webserver -n bootable-containers-demo
+virtctl console bootc-webserver -n bootable-containers-demo
 ```
 
 Check current bootc status:
+
 ```bash
 sudo bootc status
+```
+
+```code
+[bootc-user@bootc-webserver ~]$ sudo bootc status
+[ 1213.908583] SELinux:  Context unconfined_u:object_r:invalid_bootcinstall_testlabel_t:s0 is not valid (left unmapped).
+● Booted image: quay.io/rguske/bootc-webserver:v1.0
+        Digest: sha256:5d100215e05a702733f7ddbcdca54f0d69e3a4437d3c5396dab368b5ca0c8c51 (amd64)
+       Version: 9 (2026-07-31T22:34:55Z)
 ```
 
 ### Step 3: Upgrade to v1.1
 
 ```bash
+export USERNAME=<your-quay-username>
+```
+
+```bash
 sudo bootc switch quay.io/${USERNAME}/bootc-webserver:v1.1
 ```
 
+```code
+[bootc-user@bootc-webserver ~]$ sudo bootc switch quay.io/${USERNAME}/bootc-webserver:v1.1
+[ 1381.133563] evm: overlay not supported
+layers already present: 66; layers needed: 7 (1.1 GB)
+Fetched layers: 1.07 GiB in 4 minutes (4.95 MiB/s)
+
+
+  Deploying: done (15 seconds)                                                  Pruned images: 0 (layers: 0, objsize: 9.4 MB)
+Queued for next boot: quay.io/rguske/bootc-webserver:v1.1
+  Version: 9
+  Digest: sha256:728e8e1d196a4707ab8017948e27e0d73534cee037c4038fd9c05da8a2375a46
+```
+
 Reboot to apply:
+
 ```bash
 sudo systemctl reboot
 ```
 
 After reboot, refresh the browser. You should see:
+
 - **Purple theme**
 - **v1.1** badge
 - Subtitle: "Version 1.1 - Purple Edition"
 
+![Purple Webpage](static/webpage2.png)
+
 ### Step 4: Rollback to v1.0
 
-SSH back into the VM:
+Connect back into the VM:
+
 ```bash
-virtctl ssh bootc-user@bootc-webserver -n bootable-containers-demo
+virtctl console bootc-user -n bootable-containers-demo
 ```
 
 Rollback:
+
 ```bash
 sudo bootc rollback
 sudo systemctl reboot
@@ -549,7 +603,7 @@ Complete CI/CD pipelines are available in `cicd/`. See `cicd/README.md` for deta
 
 ### Pipeline Flow
 
-```
+```code
 Git Push → Build bootc → Convert to QCOW2 → Package → Deploy VM
 ```
 
@@ -628,4 +682,3 @@ COPY app-config.yaml /etc/myapp/config.yaml
 - [rhel-bootc-examples (Red Hat CoP)](https://github.com/redhat-cop/rhel-bootc-examples)
 - [bootc-org/examples](https://gitlab.com/bootc-org/examples)
 - [Fedora bootc Documentation](https://docs.fedoraproject.org/en-US/bootc/)
-
