@@ -4,7 +4,6 @@ apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
   name: bootc-webserver
-  namespace: bootable-containers-demo
   labels:
     app: bootc-webserver
 spec:
